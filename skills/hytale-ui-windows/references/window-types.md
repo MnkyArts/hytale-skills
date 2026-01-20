@@ -4,435 +4,573 @@ Complete reference for all window types and their configuration options.
 
 ## WindowType Enum
 
-| Type | Description | Slots | Features |
-|------|-------------|-------|----------|
-| `Container` | Generic item storage | Variable (9n) | Item slots only |
-| `PocketCrafting` | 2x2 portable crafting | 5 | Input grid + output |
-| `BasicCrafting` | 3x3 crafting table | 10 | Input grid + output |
-| `DiagramCrafting` | Blueprint-based crafting | Variable | Recipe diagrams |
-| `StructuralCrafting` | Building/construction | Variable | 3D structure preview |
-| `Processing` | Time-based processing | Variable | Fuel + progress bar |
-| `Memories` | Achievement/memory display | Variable | Read-only display |
-
-## Container Window
-
-Basic item storage window. Used for chests, backpacks, and custom inventories.
-
 ```java
-public class ChestWindow extends Window {
+public enum WindowType {
+    Container(0),          // Basic item container
+    PocketCrafting(1),     // Field/pocket crafting (inventory crafting)
+    BasicCrafting(2),      // Simple workbench crafting
+    DiagramCrafting(3),    // Diagram-based crafting (anvil, advanced benches)
+    StructuralCrafting(4), // Structural/block transformation crafting
+    Processing(5),         // Furnace/smelter type processing
+    Memories(6);           // Memories/achievements window
     
-    public ChestWindow(Player player, int rows) {
-        super(WindowType.Container, rows * 9);
-    }
-    
-    @Override
-    public String getTitle() {
-        return "Chest";
-    }
+    public int getValue();
+    public static WindowType fromValue(int value);
 }
 ```
 
-**Configuration:**
-- Size must be multiple of 9
-- Maximum 6 rows (54 slots)
-- Supports all slot operations
+| Type | Value | Description | Implementing Class |
+|------|-------|-------------|-------------------|
+| `Container` | 0 | Generic item storage | `ContainerWindow`, `ContainerBlockWindow` |
+| `PocketCrafting` | 1 | Field/inventory crafting | `FieldCraftingWindow` |
+| `BasicCrafting` | 2 | Standard workbench crafting | `SimpleCraftingWindow` |
+| `DiagramCrafting` | 3 | Blueprint-based crafting | `DiagramCraftingWindow` |
+| `StructuralCrafting` | 4 | Block transformation | `StructuralCraftingWindow` |
+| `Processing` | 5 | Time-based processing | `ProcessingBenchWindow` |
+| `Memories` | 6 | Read-only display | `MemoriesWindow` |
+
+## Container Windows
+
+### ContainerWindow
+
+Simple item container (not tied to a block). Implements `ItemContainerWindow`.
+
+```java
+public class ContainerWindow extends Window implements ItemContainerWindow {
+    private final ItemContainer itemContainer;
+    private final JsonObject windowData = new JsonObject();
+    
+    public ContainerWindow(int size) {
+        super(WindowType.Container);
+        this.itemContainer = new SimpleItemContainer(size);
+    }
+    
+    @Override
+    public JsonObject getData() { return windowData; }
+    
+    @Override
+    public ItemContainer getItemContainer() { return itemContainer; }
+    
+    @Override
+    protected boolean onOpen0() { return true; }
+    
+    @Override
+    protected void onClose0() { }
+}
+```
 
 **Use cases:**
-- Storage containers
-- Menu GUIs
+- Backpacks (ItemStackContainerWindow)
+- Virtual inventories
 - Trading interfaces
 - Reward displays
 
-## PocketCrafting Window
+### ContainerBlockWindow
 
-Portable 2x2 crafting grid (player inventory crafting).
+Container tied to a block in the world. Extends `BlockWindow`, implements `ItemContainerWindow`.
 
 ```java
-public class PocketCraftWindow extends Window {
+public class ContainerBlockWindow extends BlockWindow implements ItemContainerWindow {
     
-    // Slot layout:
-    // [0][1]  [4] <- Output
-    // [2][3]
-    
-    public PocketCraftWindow(Player player) {
-        super(WindowType.PocketCrafting, 5);
+    public ContainerBlockWindow(int x, int y, int z, int rotationIndex, BlockType blockType, int size) {
+        super(WindowType.Container, x, y, z, rotationIndex, blockType);
+        // ...
     }
     
+    // Handles SortItemsAction for sorting inventory
     @Override
-    protected void onAction(Player player, WindowAction action) {
-        if (action instanceof CraftRecipeAction craft) {
-            // Handle 2x2 crafting
-            attemptCraft(player, craft.getRecipeId());
+    public void handleAction(Ref<EntityStore> ref, Store<EntityStore> store, WindowAction action) {
+        if (action instanceof SortItemsAction sort) {
+            // Sort inventory
         }
     }
 }
 ```
 
-**Slot Layout:**
-| Index | Purpose |
-|-------|---------|
-| 0-3 | 2x2 input grid |
-| 4 | Output slot |
+**Window Data:**
+- `blockItemId` - Block's item ID
 
 **Features:**
-- Limited recipe set (2x2 only)
-- No bench requirement
-- Accessible anywhere
+- Automatic distance validation (default 7.0 blocks)
+- Block existence validation
+- Supports `SortItemsAction`
 
-## BasicCrafting Window
+### ItemStackContainerWindow
 
-Standard 3x3 crafting table interface.
+Container tied to an ItemStack (e.g., bags). Implements `ItemContainerWindow`.
 
 ```java
-public class CraftingTableWindow extends CraftingWindow {
+public class ItemStackContainerWindow extends Window implements ItemContainerWindow {
+    // Auto-closes when parent item becomes invalid
+}
+```
+
+## FieldCraftingWindow (PocketCrafting)
+
+Pocket/inventory crafting. Extends `Window` directly (not BlockWindow).
+
+```java
+public class FieldCraftingWindow extends Window {
     
-    // Slot layout:
-    // [0][1][2]  [9] <- Output
-    // [3][4][5]
-    // [6][7][8]
-    
-    public CraftingTableWindow(Player player, BlockPos pos) {
-        super(player, pos, BenchType.Crafting);
+    public FieldCraftingWindow() {
+        super(WindowType.PocketCrafting);
     }
     
+    // Handles CraftRecipeAction
     @Override
-    protected List<RecipeCategory> getAvailableCategories() {
-        return List.of(
-            RecipeCategory.TOOLS,
-            RecipeCategory.WEAPONS,
-            RecipeCategory.ARMOR,
-            RecipeCategory.BUILDING,
-            RecipeCategory.MISC
-        );
+    public void handleAction(Ref<EntityStore> ref, Store<EntityStore> store, WindowAction action) {
+        if (action instanceof CraftRecipeAction craft) {
+            // Handle fieldcraft recipe
+        }
     }
 }
 ```
 
-**Slot Layout:**
-| Index | Purpose |
-|-------|---------|
-| 0-8 | 3x3 input grid |
-| 9 | Output slot |
+**Window Data:**
+- `type` - BenchType.Crafting ordinal
+- `id` - "Fieldcraft"
+- `name` - Translation key
+- `categories` - Fieldcraft categories with recipes
+- `worldMemoriesLevel` - World memories level
 
 **Features:**
-- Full recipe access
+- Accessible anywhere (no block required)
+- Limited recipe set (fieldcraft recipes only)
+- No bench tier system
+
+## SimpleCraftingWindow (BasicCrafting)
+
+Standard workbench crafting. Extends `CraftingWindow`, implements `MaterialContainerWindow`.
+
+```java
+public class SimpleCraftingWindow extends CraftingWindow implements MaterialContainerWindow {
+    
+    public SimpleCraftingWindow(BenchState benchState) {
+        super(WindowType.BasicCrafting, benchState);
+    }
+    
+    // Handles CraftRecipeAction, TierUpgradeAction
+    @Override
+    public void handleAction(Ref<EntityStore> ref, Store<EntityStore> store, WindowAction action) {
+        if (action instanceof CraftRecipeAction craft) {
+            craftSimpleItem(store, ref, craftingManager, craft);
+        } else if (action instanceof TierUpgradeAction) {
+            handleTierUpgrade(ref, store);
+        }
+    }
+}
+```
+
+**Window Data (inherited from BenchWindow):**
+- `type` - Bench type ordinal
+- `id` - Bench ID string
+- `name` - Translation key
+- `blockItemId` - Item ID
+- `tierLevel` - Current tier level
+- `worldMemoriesLevel` - World memories level
+- `progress` - Crafting progress (0.0 - 1.0)
+- `tierUpgradeProgress` - Tier upgrade progress
+- `categories` - Array of bench categories
+
+**Features:**
+- Full recipe access based on bench type
 - Category filtering
 - Recipe book integration
+- Tier upgrade support
+- Extra materials section
 
-## DiagramCrafting Window
+## DiagramCraftingWindow (DiagramCrafting)
 
-Blueprint-based crafting for advanced recipes.
+Blueprint/diagram-based crafting (e.g., anvil). Extends `CraftingWindow`, implements `ItemContainerWindow`.
 
 ```java
-public class BlueprintBenchWindow extends DiagramCraftingWindow {
+public class DiagramCraftingWindow extends CraftingWindow implements ItemContainerWindow {
     
-    public BlueprintBenchWindow(Player player, BlockPos pos) {
-        super(player, pos);
+    private String category;           // Current category
+    private String itemCategory;       // Current item category
+    private SimpleItemContainer inputPrimaryContainer;
+    private SimpleItemContainer inputSecondaryContainer;
+    private SimpleItemContainer outputContainer;
+    private CombinedItemContainer combinedInputItemContainer;
+    private CombinedItemContainer combinedItemContainer;
+    
+    public DiagramCraftingWindow(BenchState benchState) {
+        super(WindowType.DiagramCrafting, benchState);
     }
     
+    // Handles CancelCraftingAction, UpdateCategoryAction, CraftItemAction
     @Override
-    public String getTitle() {
-        return "Blueprint Workbench";
-    }
-    
-    @Override
-    protected List<BlueprintRecipe> getAvailableBlueprints(Player player) {
-        // Return blueprints player has unlocked
-        return player.getKnowledgeManager()
-            .getUnlockedBlueprints()
-            .stream()
-            .filter(bp -> bp.getBenchType() == BenchType.DiagramCrafting)
-            .toList();
-    }
-    
-    @Override
-    protected void onBlueprintSelected(Player player, BlueprintRecipe blueprint) {
-        // Show required materials
-        displayRequirements(blueprint.getInputs());
+    public void handleAction(Ref<EntityStore> ref, Store<EntityStore> store, WindowAction action) {
+        if (action instanceof CancelCraftingAction) {
+            cancelCurrentCraft();
+        } else if (action instanceof UpdateCategoryAction update) {
+            this.category = update.category;
+            this.itemCategory = update.itemCategory;
+            updateCategoryDisplay();
+        } else if (action instanceof CraftItemAction) {
+            confirmDiagramCraft();
+        }
     }
 }
 ```
+
+**Window Data (additional):**
+- `slots` - Slot data with:
+  - `inventoryHint` - Item hints for empty slots
+  - `requiredAmount` - Required item count
+- `categories` - With nested `itemCategories`
 
 **Features:**
 - Visual diagram display
-- Blueprint unlock system
-- Complex multi-step recipes
-- Preview of output
+- Multi-slot input (primary + secondary containers)
+- Category navigation
+- Craft cancellation support
 
-## StructuralCrafting Window
+## StructuralCraftingWindow (StructuralCrafting)
 
-For building and construction recipes with 3D previews.
+Block transformation crafting (e.g., stonecutter). Extends `CraftingWindow`, implements `ItemContainerWindow`.
 
 ```java
-public class ConstructionBenchWindow extends StructuralCraftingWindow {
+public class StructuralCraftingWindow extends CraftingWindow implements ItemContainerWindow {
     
-    public ConstructionBenchWindow(Player player, BlockPos pos) {
-        super(player, pos);
+    public static final int MAX_OPTIONS = 64;
+    
+    private SimpleItemContainer inputContainer;
+    private SimpleItemContainer optionsContainer;
+    private CombinedItemContainer combinedItemContainer;
+    private Int2ObjectMap<String> optionSlotToRecipeMap;
+    private int selectedSlot;
+    
+    public StructuralCraftingWindow(BenchState benchState) {
+        super(WindowType.StructuralCrafting, benchState);
     }
     
+    // Handles SelectSlotAction, CraftRecipeAction, ChangeBlockAction
     @Override
-    public String getTitle() {
-        return "Construction Bench";
-    }
-    
-    @Override
-    protected List<StructuralRecipe> getAvailableStructures() {
-        return StructuralRecipeRegistry.getAll();
-    }
-    
-    @Override
-    protected void onStructureSelected(Player player, StructuralRecipe recipe) {
-        // Send 3D preview to client
-        sendStructurePreview(player, recipe.getPreviewData());
-    }
-    
-    @Override
-    protected boolean canBuild(Player player, StructuralRecipe recipe) {
-        // Check materials and space
-        return hasRequiredMaterials(player, recipe) && 
-               hasSpaceToBuild(player.getWorld(), getOutputPosition());
+    public void handleAction(Ref<EntityStore> ref, Store<EntityStore> store, WindowAction action) {
+        if (action instanceof SelectSlotAction select) {
+            selectedSlot = select.slot;
+            invalidate();
+        } else if (action instanceof CraftRecipeAction craft) {
+            craftSelectedRecipe(ref, store, craft);
+        } else if (action instanceof ChangeBlockAction change) {
+            cycleBlockType(change.down);
+        }
     }
 }
 ```
+
+**Window Data (additional):**
+- `selected` - Selected option slot index
+- `allowBlockGroupCycling` - Whether block cycling is allowed
+- `alwaysShowInventoryHints` - Show hints on all slots
+- `dividerIndex` - Divider between header and regular recipes
+- `optionSlotRecipes` - Map of slot to recipe ID
+- `inventoryHints` - Item hints for slots
 
 **Features:**
-- 3D structure preview
-- Placement validation
-- Multi-block output
-- Rotation support
+- Grid of output options (up to 64)
+- Slot selection for crafting
+- Block group cycling (e.g., different wood types)
+- Inventory hints display
 
-## Processing Window
+## ProcessingBenchWindow (Processing)
 
-Furnace-like processing with fuel and time.
+Furnace/smelter type processing. Extends `BenchWindow`, implements `ItemContainerWindow`.
 
 ```java
-public class FurnaceWindow extends ProcessingWindow {
+public class ProcessingBenchWindow extends BenchWindow implements ItemContainerWindow {
     
-    // Slot layout:
-    // [0] <- Input
-    // [1] <- Fuel
-    // [2] <- Output
+    private CombinedItemContainer itemContainer;
+    private float fuelTime;
+    private int maxFuel;
+    private float progress;
+    private boolean active;
+    private Set<Short> processingSlots;
+    private Set<Short> processingFuelSlots;
     
-    public FurnaceWindow(Player player, BlockPos pos) {
-        super(player, pos, BenchType.Processing);
+    public ProcessingBenchWindow(BenchState benchState) {
+        super(WindowType.Processing, benchState);
     }
     
-    @Override
-    public String getTitle() {
-        return "Furnace";
-    }
+    // State setters
+    public void setActive(boolean active);
+    public void setProgress(float progress);
+    public void setFuelTime(float fuelTime);
+    public void setMaxFuel(int maxFuel);
+    public void setProcessingSlots(Set<Short> slots);
+    public void setProcessingFuelSlots(Set<Short> slots);
     
+    // Handles SetActiveAction, TierUpgradeAction
     @Override
-    protected int getInputSlot() { return 0; }
-    
-    @Override
-    protected int getFuelSlot() { return 1; }
-    
-    @Override
-    protected int getOutputSlot() { return 2; }
-    
-    @Override
-    protected float getProcessingSpeed() {
-        return 1.0f; // 1x speed
-    }
-    
-    @Override
-    protected boolean acceptsFuel(ItemStack item) {
-        return FuelRegistry.isFuel(item);
-    }
-    
-    @Override
-    protected int getFuelBurnTime(ItemStack fuel) {
-        return FuelRegistry.getBurnTime(fuel);
-    }
-    
-    @Override
-    protected ProcessingRecipe findRecipe(ItemStack input) {
-        return ProcessingRecipeRegistry.findRecipe(input, BenchType.Processing);
+    public void handleAction(Ref<EntityStore> ref, Store<EntityStore> store, WindowAction action) {
+        if (action instanceof SetActiveAction activeAction) {
+            setActive(activeAction.state);
+            invalidate();
+        } else if (action instanceof TierUpgradeAction) {
+            handleTierUpgrade(ref, store);
+        }
     }
 }
 ```
 
-**Slot Layout:**
-| Index | Purpose |
-|-------|---------|
-| 0 | Input item |
-| 1 | Fuel item |
-| 2 | Output item |
+**Window Data (additional):**
+- `active` - Processing active state
+- `progress` - Current progress (0.0 - 1.0)
+- `fuel` - Fuel slot data
+- `maxFuel` - Maximum fuel capacity
+- `fuelTime` - Current fuel remaining
+- `processingSlots` - Bitmask of slots currently processing
+- `processingFuelSlots` - Bitmask of fuel slots in use
+- `outputSlotsCount` - Number of output slots
+- `input` - Input slot data
+- `inventoryHints` - Item hints for slots
 
 **Features:**
 - Progress bar display
-- Fuel consumption
+- Fuel consumption tracking
 - Time-based processing
-- Keep state on close
+- Multiple input/output slot support
+- Active toggle control
 
-**Progress Updates:**
+## MemoriesWindow (Memories)
+
+Read-only display for achievements/memories. Extends `Window` directly.
 
 ```java
-// Processing window sends progress updates
-@Override
-protected void tick() {
-    super.tick();
+public class MemoriesWindow extends Window {
     
-    if (isProcessing()) {
-        // Send progress to client
-        sendProgressUpdate(getProgress(), getMaxProgress());
+    private final JsonObject windowData = new JsonObject();
+    
+    public MemoriesWindow() {
+        super(WindowType.Memories);
     }
+    
+    @Override
+    public JsonObject getData() {
+        return windowData;
+    }
+    
+    @Override
+    protected boolean onOpen0() {
+        loadMemories();
+        return true;
+    }
+    
+    @Override
+    protected void onClose0() { }
 }
 ```
 
-## Memories Window
-
-Read-only display for achievements, memories, or collections.
-
-```java
-public class AchievementsWindow extends Window {
-    
-    public AchievementsWindow(Player player) {
-        super(WindowType.Memories, 54);
-        loadAchievements(player);
-    }
-    
-    @Override
-    public String getTitle() {
-        return "Achievements";
-    }
-    
-    private void loadAchievements(Player player) {
-        List<Achievement> achievements = AchievementManager.getAll();
-        
-        for (int i = 0; i < achievements.size() && i < getSize(); i++) {
-            Achievement ach = achievements.get(i);
-            boolean unlocked = player.hasAchievement(ach.getId());
-            setItem(i, createAchievementItem(ach, unlocked));
-        }
-    }
-    
-    private ItemStack createAchievementItem(Achievement ach, boolean unlocked) {
-        ItemStack item = new ItemStack(unlocked ? Items.DIAMOND : Items.COAL);
-        item.setDisplayName((unlocked ? "§a" : "§7") + ach.getName());
-        item.setLore(List.of(
-            ach.getDescription(),
-            "",
-            unlocked ? "§aUnlocked!" : "§7Locked"
-        ));
-        return item;
-    }
-    
-    @Override
-    public boolean canTakeItem(int slot) {
-        return false; // Read-only
-    }
-    
-    @Override
-    public boolean canPlaceItem(int slot, ItemStack item) {
-        return false; // Read-only
-    }
-}
-```
+**Window Data:**
+- `capacity` - Memory capacity
+- `memories` - Array of memory objects with:
+  - `title` - Memory title
+  - `tooltipText` - Tooltip description
+  - `icon` - Memory icon
+  - `categoryIcon` - Category icon
 
 **Features:**
 - Read-only display
 - Visual representation of data
 - No item manipulation
+- Client-requestable (registered in MemoriesPlugin)
 
-## BenchType Configuration
-
-Each bench type has specific configuration:
-
-### Crafting Bench Config
+**Registration:**
 
 ```java
-public record CraftingBenchConfig(
-    List<RecipeCategory> categories,
-    int gridSize,                    // 2 or 3
-    boolean requiresKnowledge,
-    float craftingSpeedMultiplier
-) {
-    public static final CraftingBenchConfig DEFAULT = new CraftingBenchConfig(
-        List.of(RecipeCategory.values()),
-        3,
-        false,
-        1.0f
+// In MemoriesPlugin.setup()
+Window.CLIENT_REQUESTABLE_WINDOW_TYPES.put(
+    WindowType.Memories,
+    MemoriesWindow::new
+);
+```
+
+## BenchWindow Base Class
+
+Abstract base for all crafting bench windows.
+
+```java
+public abstract class BenchWindow extends BlockWindow implements MaterialContainerWindow {
+    
+    protected static final float CRAFTING_UPDATE_MIN_PERCENT = 0.05F;
+    protected static final long CRAFTING_UPDATE_INTERVAL_MS = 500L;
+    protected static final String BENCH_UPGRADING = "BenchUpgrading";
+    
+    protected final Bench bench;
+    protected final BenchState benchState;
+    protected final JsonObject windowData = new JsonObject();
+    private MaterialExtraResourcesSection extraResourcesSection;
+    
+    // Inherited window data properties:
+    // - type: bench type ordinal
+    // - id: bench ID string
+    // - name: translation key
+    // - blockItemId: item ID
+    // - tierLevel: current tier level
+    
+    public void updateCraftingJob(float percent);       // Update crafting progress
+    public void updateBenchUpgradeJob(float percent);   // Update tier upgrade progress
+    public void updateBenchTierLevel(int newValue);     // Handle tier level change
+    
+    protected int getBenchTierLevel();
+    
+    @Override
+    public MaterialExtraResourcesSection getExtraResourcesSection();
+    
+    @Override
+    public void invalidateExtraResources();
+    
+    @Override
+    public boolean isValid();
+}
+```
+
+### CraftingWindow Abstract Class
+
+```java
+public abstract class CraftingWindow extends BenchWindow {
+    
+    public static final int SET_BLOCK_SETTINGS = 6;
+    protected static final String CRAFT_COMPLETED = "CraftCompleted";
+    protected static final String CRAFT_COMPLETED_INSTANT = "CraftCompletedInstant";
+    
+    // Window data adds:
+    // - categories: array of bench categories
+    // - memoriesPerLevel: array of memory amounts
+    
+    protected void setBlockInteractionState(String state, World world, int setBlockSettings);
+    
+    public static void craftSimpleItem(
+        Store<EntityStore> store,
+        Ref<EntityStore> ref,
+        CraftingManager craftingManager,
+        CraftRecipeAction action
     );
 }
 ```
 
-### Processing Bench Config
+## Window Interfaces
+
+### ItemContainerWindow
+
+Windows with item inventory slots.
 
 ```java
-public record ProcessingBenchConfig(
-    float processingSpeed,
-    float fuelEfficiency,
-    List<ItemTag> acceptedFuels,
-    boolean keepProgressOnClose
-) {
-    public static final ProcessingBenchConfig FURNACE = new ProcessingBenchConfig(
-        1.0f,
-        1.0f,
-        List.of(ItemTags.FUEL),
-        true
-    );
-    
-    public static final ProcessingBenchConfig BLAST_FURNACE = new ProcessingBenchConfig(
-        2.0f,  // 2x speed
-        0.5f,  // Uses fuel faster
-        List.of(ItemTags.FUEL),
-        true
-    );
+public interface ItemContainerWindow {
+    @Nonnull ItemContainer getItemContainer();
 }
 ```
 
-## Window Size Reference
+**Automatic behaviors when implemented:**
+- WindowManager registers change listener on container
+- InventorySection included in OpenWindow/UpdateWindow packets
+- Listener unregistered on window close
 
-| Window Type | Min Size | Max Size | Common Sizes |
-|-------------|----------|----------|--------------|
-| Container | 9 | 54 | 9, 18, 27, 36, 45, 54 |
-| PocketCrafting | 5 | 5 | 5 |
-| BasicCrafting | 10 | 10 | 10 |
-| DiagramCrafting | 9 | 54 | Varies by recipe |
-| StructuralCrafting | 9 | 54 | Varies by bench |
-| Processing | 3 | 9 | 3 (basic), 6 (with upgrades) |
-| Memories | 9 | 54 | 27, 54 |
+### MaterialContainerWindow
 
-## Custom Window Type Pattern
-
-For completely custom behavior:
+Windows with extra resource materials.
 
 ```java
-public class CustomGameWindow extends Window {
+public interface MaterialContainerWindow {
+    @Nonnull MaterialExtraResourcesSection getExtraResourcesSection();
+    void invalidateExtraResources();
+    boolean isValid();
+}
+```
+
+**Automatic behaviors when implemented:**
+- ExtraResources included in OpenWindow/UpdateWindow packets (when invalid)
+
+### ValidatedWindow
+
+Windows that validate their state periodically.
+
+```java
+public interface ValidatedWindow {
+    boolean validate();
+}
+```
+
+**Automatic behaviors when implemented:**
+- `WindowManager.validateWindows()` calls `validate()` on each
+- Window is closed if `validate()` returns false
+
+## Class Hierarchy Summary
+
+```
+Window (abstract)
+├── ContainerWindow (implements ItemContainerWindow)
+├── ItemStackContainerWindow (implements ItemContainerWindow)
+├── FieldCraftingWindow
+├── MemoriesWindow
+└── BlockWindow (abstract, implements ValidatedWindow)
+    ├── ContainerBlockWindow (implements ItemContainerWindow)
+    └── BenchWindow (abstract, implements MaterialContainerWindow)
+        ├── ProcessingBenchWindow (implements ItemContainerWindow)
+        └── CraftingWindow (abstract)
+            ├── SimpleCraftingWindow (implements MaterialContainerWindow)
+            ├── DiagramCraftingWindow (implements ItemContainerWindow)
+            └── StructuralCraftingWindow (implements ItemContainerWindow)
+```
+
+## Custom Window Implementation Pattern
+
+For completely custom window behavior:
+
+```java
+public class CustomGameWindow extends Window implements ItemContainerWindow {
     
+    private final JsonObject windowData = new JsonObject();
+    private final SimpleItemContainer itemContainer;
     private final GameState state;
     
-    public CustomGameWindow(Player player, GameState state) {
-        super(WindowType.Container, 54); // Use container as base
+    public CustomGameWindow(GameState state) {
+        super(WindowType.Container); // Use Container as base type
         this.state = state;
+        this.itemContainer = new SimpleItemContainer(54);
         initializeGame();
     }
     
     @Override
-    public String getTitle() {
-        return "Mini Game - Score: " + state.getScore();
+    public JsonObject getData() {
+        windowData.addProperty("score", state.getScore());
+        windowData.addProperty("currentPlayer", state.getCurrentPlayer());
+        return windowData;
+    }
+    
+    @Override
+    public ItemContainer getItemContainer() {
+        return itemContainer;
     }
     
     private void initializeGame() {
-        // Set up game board
-        clearAll();
+        // Set up game board in item container
         placeGamePieces();
     }
     
     @Override
-    protected void onAction(Player player, WindowAction action) {
-        if (action instanceof ClickSlotAction click) {
+    public void handleAction(Ref<EntityStore> ref, Store<EntityStore> store, WindowAction action) {
+        if (action instanceof SelectSlotAction select) {
             if (!state.isPlayerTurn()) {
-                player.sendMessage("Not your turn!");
+                sendMessage(ref, "Not your turn!");
                 return;
             }
             
-            processGameMove(player, click.getSlot());
+            processGameMove(select.slot);
             checkWinCondition();
-            updateDisplay(player);
+            invalidate();
         }
+    }
+    
+    @Override
+    protected boolean onOpen0() {
+        return true;
+    }
+    
+    @Override
+    protected void onClose0() {
+        // Cleanup game state
     }
 }
 ```

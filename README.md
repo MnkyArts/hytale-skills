@@ -1,4 +1,6 @@
-# Hytale Plugin Development Skills
+# Hytale Agent Skills
+
+> Please read the Disclaimer!
 
 A collection of Agent Skills for AI-assisted Hytale server plugin development.
 
@@ -62,4 +64,4 @@ Found an error or want to improve a skill? Contributions are welcome. Keep in mi
 
 ## License
 
-MIT
+MIT (obviously)

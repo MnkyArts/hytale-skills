@@ -3,7 +3,7 @@ name: hytale-ui-windows
 description: Create custom UI windows, containers, and interactive interfaces for Hytale plugins. Use when asked to "create inventory UI", "make custom window", "add container interface", "build crafting UI", or "custom GUI".
 metadata:
   author: hytale-modding
-  version: "1.0.0"
+  version: "1.1.0"
 ---
 
 # Hytale UI Windows
@@ -22,82 +22,126 @@ Use this skill when:
 
 ## Window Architecture Overview
 
-Hytale uses a window system for server-controlled UI. Windows are opened server-side and rendered client-side, with actions sent back to the server for processing.
+Hytale uses a window system for server-controlled UI. Windows are opened server-side and rendered client-side, with actions sent back to the server for processing. Window data is transmitted as JSON and inventory contents are synced separately.
 
 ### Window Class Hierarchy
 
 ```
-Window
-├── BlockWindow            # Tied to a block in the world
-│   └── BenchWindow        # Crafting bench base
-│       ├── CraftingWindow         # Standard crafting
-│       ├── ProcessingWindow       # Furnace-like processing
-│       ├── DiagramCraftingWindow  # Blueprint crafting
-│       └── StructuralCraftingWindow
-├── ContainerWindow        # Generic container
-└── CustomWindow           # Fully custom windows
+Window (abstract)
+├── ContainerWindow                  # Simple item container (implements ItemContainerWindow)
+├── ItemStackContainerWindow         # Container tied to an ItemStack (implements ItemContainerWindow)
+├── FieldCraftingWindow              # Pocket/inventory crafting (WindowType.PocketCrafting)
+├── MemoriesWindow                   # Memories/achievements display (WindowType.Memories)
+└── BlockWindow (abstract)           # Tied to a block in the world (implements ValidatedWindow)
+    ├── ContainerBlockWindow         # Container tied to a block (implements ItemContainerWindow)
+    └── BenchWindow (abstract)       # Crafting bench base (implements MaterialContainerWindow)
+        ├── ProcessingBenchWindow    # Furnace-like processing (implements ItemContainerWindow)
+        └── CraftingWindow (abstract)
+            ├── SimpleCraftingWindow       # Basic workbench crafting (implements MaterialContainerWindow)
+            ├── DiagramCraftingWindow      # Blueprint/anvil crafting (implements ItemContainerWindow)
+            └── StructuralCraftingWindow   # Block transformation crafting (implements ItemContainerWindow)
 ```
 
-### Window Types
+### Key Interfaces
 
-| WindowType | Description | Use Case |
-|------------|-------------|----------|
-| `Container` | Item storage | Chests, backpacks |
-| `PocketCrafting` | 2x2 crafting | Player inventory crafting |
-| `BasicCrafting` | 3x3 crafting | Crafting tables |
-| `DiagramCrafting` | Blueprint-based | Advanced workbenches |
-| `StructuralCrafting` | Building recipes | Construction benches |
-| `Processing` | Time-based conversion | Furnaces, smelters |
-| `Memories` | Special display | Memory/achievement UI |
+| Interface | Purpose |
+|-----------|---------|
+| `ItemContainerWindow` | Windows with item inventory slots |
+| `MaterialContainerWindow` | Windows with extra resource materials |
+| `ValidatedWindow` | Windows that validate state (e.g., player distance) |
+
+### Window Types (WindowType Enum)
+
+| WindowType | Value | Description | Use Case |
+|------------|-------|-------------|----------|
+| `Container` | 0 | Item storage | Chests, backpacks |
+| `PocketCrafting` | 1 | Field crafting | Player inventory crafting |
+| `BasicCrafting` | 2 | Standard crafting | Crafting tables |
+| `DiagramCrafting` | 3 | Blueprint-based | Advanced workbenches, anvils |
+| `StructuralCrafting` | 4 | Block transformation | Stonecutters, construction benches |
+| `Processing` | 5 | Time-based conversion | Furnaces, smelters |
+| `Memories` | 6 | Special display | Memory/achievement UI |
 
 ### Window Flow
 
 ```
-Server: Open Window -> Send Packet -> Client: Render UI
-Client: User Action -> Send Packet -> Server: Process Action -> Update State
-Server: State Change -> Send Update -> Client: Refresh UI
+Server: openWindow(window) -> OpenWindow packet (ID 200) -> Client: Render UI
+Client: User Action -> SendWindowAction packet (ID 203) -> Server: handleAction()
+Server: invalidate() -> updateWindows() -> UpdateWindow packet (ID 201) -> Client: Refresh UI
+Server: closeWindow() -> CloseWindow packet (ID 202) -> Client: Close UI
+```
+
+### Window Data Pattern
+
+Windows use `getData()` to return a `JsonObject` that is serialized and sent to the client. This data controls client-side rendering:
+
+```java
+@Override
+public JsonObject getData() {
+    JsonObject data = new JsonObject();
+    data.addProperty("type", windowType.ordinal());
+    data.addProperty("title", "My Window");
+    data.addProperty("customProperty", someValue);
+    return data;
+}
 ```
 
 ## Basic Window Implementation
 
-### Simple Container Window
+### Abstract Window Base
+
+All windows extend from `Window` and must implement these abstract methods:
 
 ```java
 package com.example.myplugin.windows;
 
+import com.google.gson.JsonObject;
 import com.hypixel.hytale.server.core.entity.entities.player.windows.Window;
-import com.hypixel.hytale.server.core.entity.entities.player.windows.WindowType;
-import com.hypixel.hytale.server.core.entity.entities.player.Player;
+import com.hypixel.hytale.protocol.packets.window.WindowType;
+import com.hypixel.hytale.protocol.packets.window.WindowAction;
+import com.hypixel.hytale.component.Ref;
+import com.hypixel.hytale.component.Store;
+import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 
-public class StorageWindow extends Window {
+public class CustomWindow extends Window {
     
-    private static final int ROWS = 3;
-    private static final int COLS = 9;
+    private final JsonObject windowData = new JsonObject();
     
-    public StorageWindow(Player player) {
-        super(WindowType.Container, ROWS * COLS);
+    public CustomWindow() {
+        super(WindowType.Container);
+        // Initialize window data
+        windowData.addProperty("title", "Custom Window");
     }
     
     @Override
-    public String getTitle() {
-        return "Storage";
+    public JsonObject getData() {
+        // Return data to send to client (serialized as JSON)
+        return windowData;
     }
     
     @Override
-    protected void onOpen(Player player) {
+    protected boolean onOpen0() {
         // Called when window opens
-        loadItems();
+        // Return false to cancel opening
+        return true;
     }
     
     @Override
-    protected void onClose(Player player) {
-        // Called when window closes
-        saveItems();
+    protected void onClose0() {
+        // Called when window closes - cleanup here
+    }
+    
+    @Override
+    public void handleAction(Ref<EntityStore> ref, Store<EntityStore> store, WindowAction action) {
+        // Handle window actions from client
+        // Default implementation is no-op
     }
 }
 ```
 
 ### Opening Windows
+
+Windows are opened through the `WindowManager`:
 
 ```java
 public class StorageCommand extends AbstractPlayerCommand {
@@ -108,310 +152,440 @@ public class StorageCommand extends AbstractPlayerCommand {
     
     @Override
     protected void execute(CommandContext ctx, Player player) {
-        StorageWindow window = new StorageWindow(player);
-        player.openWindow(window);
+        StorageWindow window = new StorageWindow();
+        
+        // Open via WindowManager
+        WindowManager windowManager = player.getWindowManager();
+        OpenWindow packet = windowManager.openWindow(window);
+        
+        if (packet != null) {
+            // Window opened successfully - packet is sent automatically
+            player.sendMessage("Window opened!");
+        } else {
+            // Opening was cancelled (onOpen0() returned false)
+            player.sendMessage("Failed to open window");
+        }
     }
 }
 ```
 
+### Updating Windows
+
+Mark a window as needing update with `invalidate()`:
+
+```java
+public void updateData(String newValue) {
+    windowData.addProperty("value", newValue);
+    invalidate(); // Mark for update
+}
+
+// For full rebuild (client re-renders entire window)
+public void requireRebuild() {
+    setNeedRebuild();
+    invalidate();
+}
+```
+
+Updates are batched and sent via `WindowManager.updateWindows()` which checks `isDirty` flag.
+
 ## Window Manager
 
-The `WindowManager` handles window lifecycle:
+The `WindowManager` handles window lifecycle for each player:
 
 ```java
 // Get player's window manager
 WindowManager windowManager = player.getWindowManager();
 
-// Open a window
-windowManager.openWindow(new MyWindow(player));
+// Open a window (returns OpenWindow packet or null if cancelled)
+OpenWindow packet = windowManager.openWindow(new MyWindow());
 
-// Get current open window
-Optional<Window> currentWindow = windowManager.getCurrentWindow();
+// Open multiple windows atomically (all or none)
+List<OpenWindow> packets = windowManager.openWindows(window1, window2);
 
-// Close current window
-windowManager.closeWindow();
+// Get window by ID
+Window window = windowManager.getWindow(windowId);
 
-// Check if window is open
-boolean hasWindow = windowManager.hasOpenWindow();
+// Get all open windows
+List<Window> windows = windowManager.getWindows();
+
+// Update a specific window (sends UpdateWindow packet)
+windowManager.updateWindow(window);
+
+// Update all dirty windows
+windowManager.updateWindows();
+
+// Validate all ValidatedWindow instances (closes invalid ones)
+windowManager.validateWindows();
+
+// Close a specific window
+windowManager.closeWindow(windowId);
+
+// Close all windows
+windowManager.closeAllWindows();
+
+// Mark a window as changed
+windowManager.markWindowChanged(windowId);
 ```
+
+### Window IDs
+
+- ID `0` is reserved for client-requested windows
+- ID `-1` is invalid
+- Server-assigned IDs start at 1 and increment
 
 ## Block Windows
 
-Windows tied to blocks in the world (chests, crafting tables):
+Windows tied to blocks in the world (chests, crafting tables). Extends `BlockWindow` which implements `ValidatedWindow`:
 
 ```java
-public class CustomChestWindow extends BlockWindow {
+public class CustomChestWindow extends BlockWindow implements ItemContainerWindow {
     
-    private final BlockPos blockPos;
+    private final SimpleItemContainer itemContainer;
+    private final JsonObject windowData = new JsonObject();
     
-    public CustomChestWindow(Player player, BlockPos pos) {
-        super(WindowType.Container, 27); // 3 rows
-        this.blockPos = pos;
+    public CustomChestWindow(int x, int y, int z, int rotationIndex, BlockType blockType) {
+        super(WindowType.Container, x, y, z, rotationIndex, blockType);
+        this.itemContainer = new SimpleItemContainer(27); // 3 rows
+        
+        // Set max interaction distance (default: 7.0)
+        setMaxDistance(7.0);
+        
+        // Initialize window data
+        Item item = blockType.getItem();
+        windowData.addProperty("blockItemId", item != null ? item.getId() : "");
     }
     
     @Override
-    public String getTitle() {
-        return "Custom Chest";
+    public JsonObject getData() {
+        return windowData;
     }
     
     @Override
-    public BlockPos getBlockPosition() {
-        return blockPos;
+    public ItemContainer getItemContainer() {
+        return itemContainer;
     }
     
     @Override
-    protected void onOpen(Player player) {
+    protected boolean onOpen0() {
         // Load chest contents from block entity
-        BlockEntity entity = player.getWorld().getBlockEntity(blockPos);
-        if (entity instanceof ChestBlockEntity chest) {
-            loadItemsFrom(chest.getInventory());
-        }
+        PlayerRef playerRef = getPlayerRef();
+        Ref<EntityStore> ref = playerRef.getReference();
+        Store<EntityStore> store = ref.getStore();
+        World world = store.getExternalData().getWorld();
+        
+        // Load items from persistent storage
+        loadItemsFromWorld(world);
+        return true;
     }
     
     @Override
-    protected void onClose(Player player) {
-        // Save chest contents to block entity
-        BlockEntity entity = player.getWorld().getBlockEntity(blockPos);
-        if (entity instanceof ChestBlockEntity chest) {
-            saveItemsTo(chest.getInventory());
-        }
+    protected void onClose0() {
+        // Save chest contents
+        saveItemsToWorld();
     }
 }
 ```
 
+### Block Validation
+
+`BlockWindow` automatically validates that:
+1. Player is within `maxDistance` of the block (default 7.0 blocks)
+2. The block still exists in the world
+3. The block type matches (via item comparison)
+
+When validation fails, the window is automatically closed.
+
 ### Block Interaction Handler
 
 ```java
-public class ChestInteractionHandler implements BlockInteractionListener {
+@EventHandler
+public void onBlockInteract(BlockInteractEvent event) {
+    Player player = event.getPlayer();
+    BlockPos pos = event.getBlockPos();
+    Block block = event.getBlock();
     
-    @Override
-    public boolean onBlockInteract(Player player, BlockPos pos, Block block) {
-        if (block.getType() == BlockTypes.CUSTOM_CHEST) {
-            player.openWindow(new CustomChestWindow(player, pos));
-            return true; // Handled
-        }
-        return false;
+    if (block.getType().getId().equals("my_mod:custom_chest")) {
+        CustomChestWindow window = new CustomChestWindow(
+            pos.x(), pos.y(), pos.z(),
+            block.getRotationIndex(),
+            block.getType()
+        );
+        player.getWindowManager().openWindow(window);
+        event.setCancelled(true);
     }
 }
 ```
 
 ## Crafting Windows
 
-### Basic Crafting Window
+### BenchWindow Base
+
+All crafting bench windows extend `BenchWindow`:
 
 ```java
-public class WorkbenchWindow extends CraftingWindow {
+public abstract class BenchWindow extends BlockWindow implements MaterialContainerWindow {
+    protected final Bench bench;
+    protected final BenchState benchState;
+    protected final JsonObject windowData = new JsonObject();
+    private MaterialExtraResourcesSection extraResourcesSection;
     
-    public WorkbenchWindow(Player player, BlockPos pos) {
-        super(player, pos, BenchType.Crafting);
+    // Window data includes:
+    // - type: bench type ordinal
+    // - id: bench ID string
+    // - name: translation key
+    // - blockItemId: item ID
+    // - tierLevel: current tier level
+    // - worldMemoriesLevel: world memories level
+    // - progress: crafting progress (0.0 - 1.0)
+    // - tierUpgradeProgress: tier upgrade progress
+}
+```
+
+### SimpleCraftingWindow (Basic Workbench)
+
+```java
+public class WorkbenchWindow extends SimpleCraftingWindow {
+    
+    public WorkbenchWindow(BenchState benchState) {
+        super(benchState);
     }
     
     @Override
-    public String getTitle() {
-        return "Workbench";
-    }
-    
-    @Override
-    protected List<RecipeCategory> getAvailableCategories() {
-        return List.of(
-            RecipeCategory.TOOLS,
-            RecipeCategory.WEAPONS,
-            RecipeCategory.ARMOR
-        );
-    }
-    
-    @Override
-    protected boolean canCraft(Player player, CraftingRecipe recipe) {
-        // Custom craft validation
-        return player.hasKnowledge(recipe.getId()) || !recipe.requiresKnowledge();
+    public void handleAction(Ref<EntityStore> ref, Store<EntityStore> store, WindowAction action) {
+        if (action instanceof CraftRecipeAction craftAction) {
+            String recipeId = craftAction.recipeId;
+            int quantity = craftAction.quantity;
+            // Handle crafting
+            CraftingManager craftingManager = store.getComponent(ref, CraftingManager.getComponentType());
+            craftSimpleItem(store, ref, craftingManager, craftAction);
+        } else if (action instanceof TierUpgradeAction) {
+            // Handle bench tier upgrade
+            handleTierUpgrade(ref, store);
+        }
     }
 }
 ```
 
-### Processing Window (Furnace-like)
+### ProcessingBenchWindow (Furnace-like)
 
 ```java
-public class SmelterWindow extends ProcessingWindow {
+public class SmelterWindow extends ProcessingBenchWindow {
     
-    public SmelterWindow(Player player, BlockPos pos) {
-        super(player, pos, BenchType.Processing);
+    public SmelterWindow(BenchState benchState) {
+        super(benchState);
     }
     
-    @Override
-    public String getTitle() {
-        return "Smelter";
-    }
+    // ProcessingBenchWindow provides:
+    // - setActive(boolean): toggle processing
+    // - setProgress(float): update progress (0.0 - 1.0)
+    // - setFuelTime(float): current fuel remaining
+    // - setMaxFuel(int): maximum fuel capacity
+    // - setProcessingSlots(Set<Short>): slots currently processing
+    // - setProcessingFuelSlots(Set<Short>): fuel slots in use
     
     @Override
-    protected float getProcessingSpeed() {
-        return 1.0f; // Normal speed
-    }
-    
-    @Override
-    protected boolean acceptsFuel(ItemStack item) {
-        return item.hasTag(ItemTags.FUEL);
-    }
-    
-    @Override
-    protected int getFuelValue(ItemStack item) {
-        // Return burn time in ticks
-        if (item.is(Items.COAL)) return 1600;
-        if (item.is(Items.WOOD)) return 300;
-        return 0;
+    public void handleAction(Ref<EntityStore> ref, Store<EntityStore> store, WindowAction action) {
+        if (action instanceof SetActiveAction activeAction) {
+            setActive(activeAction.state);
+            invalidate();
+        } else if (action instanceof TierUpgradeAction) {
+            handleTierUpgrade(ref, store);
+        }
     }
 }
 ```
 
-## Window Slots
-
-Define slot layout for item placement:
+### Updating Crafting Progress
 
 ```java
-public class TradingWindow extends Window {
+// Update progress with throttling (min 5% change or 500ms interval)
+public void updateCraftingJob(float percent) {
+    windowData.addProperty("progress", percent);
+    checkProgressInvalidate(percent);
+}
+
+public void updateBenchUpgradeJob(float percent) {
+    windowData.addProperty("tierUpgradeProgress", percent);
+    checkProgressInvalidate(percent);
+}
+
+// On tier level change (requires full rebuild)
+public void updateBenchTierLevel(int newValue) {
+    windowData.addProperty("tierLevel", newValue);
+    updateBenchUpgradeJob(0.0f);
+    setNeedRebuild();
+    invalidate();
+}
+```
+
+## Item Container Windows
+
+Windows with inventory slots implement `ItemContainerWindow`:
+
+```java
+public interface ItemContainerWindow {
+    @Nonnull ItemContainer getItemContainer();
+}
+```
+
+### ItemContainer Integration
+
+```java
+public class InventoryWindow extends Window implements ItemContainerWindow {
     
-    // Slot indices
-    private static final int PLAYER_OFFER_START = 0;
-    private static final int PLAYER_OFFER_END = 8;
-    private static final int NPC_OFFER_START = 9;
-    private static final int NPC_OFFER_END = 17;
-    private static final int RESULT_SLOT = 18;
+    private final SimpleItemContainer itemContainer;
+    private final JsonObject windowData = new JsonObject();
     
-    public TradingWindow(Player player, NPC trader) {
-        super(WindowType.Container, 19);
+    public InventoryWindow(int size) {
+        super(WindowType.Container);
+        this.itemContainer = new SimpleItemContainer(size);
         
-        // Define slot behaviors
-        setSlotHandler(RESULT_SLOT, new OutputOnlySlot());
-        
-        for (int i = NPC_OFFER_START; i <= NPC_OFFER_END; i++) {
-            setSlotHandler(i, new ReadOnlySlot());
-        }
+        // Register change listener for automatic updates
+        itemContainer.registerChangeEvent(EventPriority.NORMAL, event -> {
+            invalidate();
+        });
     }
     
     @Override
-    public boolean canPlaceItem(int slot, ItemStack item) {
-        if (slot >= PLAYER_OFFER_START && slot <= PLAYER_OFFER_END) {
-            return true; // Player can place items in offer slots
-        }
-        return false;
+    public ItemContainer getItemContainer() {
+        return itemContainer;
     }
     
     @Override
-    public boolean canTakeItem(int slot) {
-        if (slot == RESULT_SLOT) {
-            return hasValidTrade(); // Can only take if trade is valid
-        }
-        return slot >= PLAYER_OFFER_START && slot <= PLAYER_OFFER_END;
+    public JsonObject getData() {
+        return windowData;
+    }
+    
+    @Override
+    protected boolean onOpen0() {
+        return true;
+    }
+    
+    @Override
+    protected void onClose0() {
+        // Cleanup
     }
 }
 ```
+
+**Note:** When a window implements `ItemContainerWindow`, the `WindowManager` automatically:
+1. Registers a change listener to mark the window dirty when inventory changes
+2. Includes `InventorySection` in `OpenWindow` and `UpdateWindow` packets
+3. Unregisters the listener when the window closes
 
 ## Window Actions
 
-Handle user interactions with window elements:
+Handle user interactions with `handleAction()`:
 
 ```java
-public class ShopWindow extends Window {
-    
-    public ShopWindow(Player player) {
-        super(WindowType.Container, 54);
-    }
-    
-    @Override
-    protected void onAction(Player player, WindowAction action) {
-        if (action instanceof ClickSlotAction click) {
-            handleSlotClick(player, click.getSlot(), click.getButton());
-        } else if (action instanceof CraftRecipeAction craft) {
-            handleCraftRequest(player, craft.getRecipeId());
-        } else if (action instanceof SortItemsAction sort) {
-            sortInventory();
-        }
-    }
-    
-    private void handleSlotClick(Player player, int slot, int button) {
-        if (slot < 0 || slot >= getSize()) return;
-        
-        ItemStack item = getItem(slot);
-        if (item.isEmpty()) return;
-        
-        if (button == 0) { // Left click - buy
-            buyItem(player, item);
-        } else if (button == 1) { // Right click - info
-            showItemInfo(player, item);
-        }
-    }
-    
-    private void buyItem(Player player, ItemStack item) {
-        int price = getPrice(item);
-        
-        if (player.getCurrency() < price) {
-            player.sendMessage("Not enough currency!");
-            return;
-        }
-        
-        player.removeCurrency(price);
-        player.getInventory().addItem(item.copy());
-        player.sendMessage("Purchased " + item.getName() + " for " + price);
+@Override
+public void handleAction(Ref<EntityStore> ref, Store<EntityStore> store, WindowAction action) {
+    if (action instanceof CraftRecipeAction craft) {
+        handleCraft(craft.recipeId, craft.quantity);
+    } else if (action instanceof SelectSlotAction select) {
+        handleSlotSelect(select.slot);
+    } else if (action instanceof SetActiveAction active) {
+        handleActiveToggle(active.state);
+    } else if (action instanceof SortItemsAction sort) {
+        handleSort(sort.sortType);
     }
 }
 ```
 
-### Action Types
+### WindowAction Types
 
-| Action | Description | Data |
-|--------|-------------|------|
-| `ClickSlotAction` | Slot clicked | slot, button, shift |
-| `CraftRecipeAction` | Craft request | recipeId, quantity |
-| `SortItemsAction` | Sort inventory | sortType |
-| `SwapSlotsAction` | Drag between slots | fromSlot, toSlot |
-| `DropItemAction` | Drop from slot | slot, quantity |
-| `QuickMoveAction` | Shift-click transfer | slot |
+| Type ID | Class | Fields | Description |
+|---------|-------|--------|-------------|
+| 0 | `CraftRecipeAction` | `recipeId: String`, `quantity: int` | Craft a recipe |
+| 1 | `TierUpgradeAction` | (none) | Upgrade bench tier |
+| 2 | `SelectSlotAction` | `slot: int` | Select a slot |
+| 3 | `ChangeBlockAction` | `down: boolean` | Cycle block type direction |
+| 4 | `SetActiveAction` | `state: boolean` | Toggle processing on/off |
+| 5 | `CraftItemAction` | (none) | Confirm diagram crafting |
+| 6 | `UpdateCategoryAction` | `category: String`, `itemCategory: String` | Change recipe category |
+| 7 | `CancelCraftingAction` | (none) | Cancel current crafting |
+| 8 | `SortItemsAction` | `sortType: SortType` | Sort inventory items |
+
+### SortType Enum
+
+```java
+public enum SortType {
+    Name(0),   // Sort by item translation key
+    Type(1),   // Sort by item type (Weapon, Armor, Tool, Item, Special)
+    Rarity(2); // Sort by quality value (reversed)
+}
+```
 
 ## Window Packets
 
 Network communication for windows:
 
-### Server → Client
+### Server to Client
 
-| Packet | ID | Purpose |
-|--------|-----|---------|
-| `OpenWindow` | 200 | Open window on client |
-| `UpdateWindow` | 201 | Update window contents |
-| `CloseWindow` | 202 | Close window on client |
+| Packet | ID | Fields | Purpose |
+|--------|----|--------|---------|
+| `OpenWindow` | 200 | `id`, `windowType`, `windowData`, `inventory`, `extraResources` | Open window on client |
+| `UpdateWindow` | 201 | `id`, `windowData`, `inventory`, `extraResources` | Update window contents |
+| `CloseWindow` | 202 | `id` | Close window on client |
 
-### Client → Server
+### Client to Server
 
-| Packet | ID | Purpose |
-|--------|-----|---------|
-| `SendWindowAction` | 203 | User interaction |
-| `ClientCloseWindow` | 204 | Client closed window |
+| Packet | ID | Fields | Purpose |
+|--------|----|--------|---------|
+| `SendWindowAction` | 203 | `id`, `action: WindowAction` | User interaction |
+| `ClientOpenWindow` | 204 | `type: WindowType` | Request client-initiated window |
 
-### Sending Updates
+### Packet Structure
+
+The `OpenWindow` packet includes:
+- `windowData`: JSON string with window-specific data
+- `inventory`: `InventorySection` (nullable) - only for `ItemContainerWindow`
+- `extraResources`: `ExtraResources` (nullable) - only for `MaterialContainerWindow`
 
 ```java
-public class LiveUpdatingWindow extends Window {
-    
-    private ScheduledFuture<?> updateTask;
+// Creating OpenWindow packet (done automatically by WindowManager)
+OpenWindow packet = new OpenWindow(
+    windowId,
+    window.getType(),
+    window.getData().toString(),  // JSON string
+    itemContainerWindow != null ? itemContainerWindow.getItemContainer().toPacket() : null,
+    materialContainerWindow != null ? materialContainerWindow.getExtraResourcesSection().toPacket() : null
+);
+```
+
+## Client-Requestable Windows
+
+Some windows can be opened by client request (e.g., pressing a key). Register these in `Window.CLIENT_REQUESTABLE_WINDOW_TYPES`:
+
+```java
+public class MyPlugin extends JavaPlugin {
     
     @Override
-    protected void onOpen(Player player) {
-        // Start periodic updates
-        updateTask = scheduler.scheduleAtFixedRate(() -> {
-            refreshData();
-            sendUpdate(player);
-        }, 0, 1, TimeUnit.SECONDS);
+    protected void setup() {
+        // Register client-requestable window
+        Window.CLIENT_REQUESTABLE_WINDOW_TYPES.put(
+            WindowType.Memories,
+            MemoriesWindow::new
+        );
     }
-    
-    @Override
-    protected void onClose(Player player) {
-        if (updateTask != null) {
-            updateTask.cancel(false);
-        }
-    }
-    
-    private void sendUpdate(Player player) {
-        // Send updated slot contents
-        for (int i = 0; i < getSize(); i++) {
-            player.sendPacket(new UpdateWindowSlot(getWindowId(), i, getItem(i)));
+}
+```
+
+When client sends `ClientOpenWindow` packet, the server:
+1. Looks up the `WindowType` in `CLIENT_REQUESTABLE_WINDOW_TYPES`
+2. Creates a new window instance using the supplier
+3. Opens it with ID 0 via `windowManager.clientOpenWindow(window)`
+
+```java
+// Handle client-requested window
+@PacketHandler
+public void onClientOpenWindow(ClientOpenWindow packet) {
+    Supplier<? extends Window> supplier = Window.CLIENT_REQUESTABLE_WINDOW_TYPES.get(packet.type);
+    if (supplier != null) {
+        Window window = supplier.get();
+        UpdateWindow updatePacket = windowManager.clientOpenWindow(window);
+        if (updatePacket != null) {
+            player.sendPacket(updatePacket);
         }
     }
 }
@@ -419,190 +593,233 @@ public class LiveUpdatingWindow extends Window {
 
 ## Custom Window Rendering
 
-Define custom window appearance:
+Define window appearance through `getData()`:
 
 ```java
 public class CustomMenuWindow extends Window {
     
-    public CustomMenuWindow(Player player) {
-        super(WindowType.Container, 54);
-    }
+    private final JsonObject windowData = new JsonObject();
     
-    @Override
-    public String getTitle() {
-        return "Main Menu";
-    }
-    
-    @Override
-    protected void setupLayout() {
-        // Fill border with glass panes
-        ItemStack border = new ItemStack(Items.GRAY_STAINED_GLASS_PANE);
-        border.setDisplayName(" ");
-        
-        for (int i = 0; i < 9; i++) {
-            setItem(i, border);           // Top row
-            setItem(45 + i, border);      // Bottom row
-        }
-        for (int i = 0; i < 6; i++) {
-            setItem(i * 9, border);       // Left column
-            setItem(i * 9 + 8, border);   // Right column
-        }
-        
-        // Add menu items
-        setItem(20, createMenuItem(Items.DIAMOND_SWORD, "PvP Arena", "Click to join PvP"));
-        setItem(22, createMenuItem(Items.GRASS_BLOCK, "Survival", "Click for survival mode"));
-        setItem(24, createMenuItem(Items.ENDER_PEARL, "Lobby", "Return to lobby"));
-    }
-    
-    private ItemStack createMenuItem(Item item, String name, String description) {
-        ItemStack stack = new ItemStack(item);
-        stack.setDisplayName(name);
-        stack.setLore(List.of(description));
-        return stack;
-    }
-    
-    @Override
-    protected void onAction(Player player, WindowAction action) {
-        if (action instanceof ClickSlotAction click) {
-            switch (click.getSlot()) {
-                case 20 -> joinPvP(player);
-                case 22 -> joinSurvival(player);
-                case 24 -> teleportToLobby(player);
-            }
-        }
-    }
-}
-```
-
-## Inventory Integration
-
-Access player inventory within windows:
-
-```java
-public class BackpackWindow extends Window {
-    
-    private static final int BACKPACK_SIZE = 27;
-    private static final int PLAYER_INV_START = 27;
-    
-    public BackpackWindow(Player player, ItemStack backpackItem) {
-        super(WindowType.Container, BACKPACK_SIZE + 36); // Backpack + player inv
-        
-        // Load backpack contents
-        loadFromNBT(backpackItem.getTag());
-        
-        // Mirror player inventory (slots 27-62)
-        mirrorPlayerInventory(player, PLAYER_INV_START);
-    }
-    
-    @Override
-    protected void onClose(Player player) {
-        // Save backpack contents back to item
-        ItemStack backpack = getBackpackItem(player);
-        saveToNBT(backpack.getOrCreateTag());
-    }
-    
-    private void mirrorPlayerInventory(Player player, int startSlot) {
-        Inventory playerInv = player.getInventory();
-        for (int i = 0; i < 36; i++) {
-            setItem(startSlot + i, playerInv.getItem(i));
-        }
-    }
-}
-```
-
-## Complete Example: Shop System
-
-```java
-package com.example.shop;
-
-import com.hypixel.hytale.server.core.entity.entities.player.windows.*;
-import com.hypixel.hytale.server.core.entity.entities.player.Player;
-
-public class ShopPlugin extends JavaPlugin {
-    
-    private ShopManager shopManager;
-    
-    public ShopPlugin(JavaPluginInit init) {
-        super(init);
-    }
-    
-    @Override
-    protected void setup() {
-        shopManager = new ShopManager();
-        getCommandRegistry().registerCommand(new ShopCommand(shopManager));
-    }
-}
-
-// Shop Window
-public class ShopWindow extends Window {
-    
-    private final ShopManager shopManager;
-    private final String category;
-    private int page = 0;
-    
-    public ShopWindow(Player player, ShopManager manager, String category) {
-        super(WindowType.Container, 54);
-        this.shopManager = manager;
-        this.category = category;
+    public CustomMenuWindow() {
+        super(WindowType.Container);
         setupLayout();
     }
     
     @Override
-    public String getTitle() {
-        return "Shop - " + category + " (Page " + (page + 1) + ")";
+    public JsonObject getData() {
+        return windowData;
     }
     
     private void setupLayout() {
-        // Navigation row (bottom)
-        setItem(45, createNavItem(Items.ARROW, "Previous Page"));
-        setItem(49, createNavItem(Items.BARRIER, "Close"));
-        setItem(53, createNavItem(Items.ARROW, "Next Page"));
+        windowData.addProperty("title", "Main Menu");
+        windowData.addProperty("rows", 6);
         
-        // Load shop items
-        List<ShopItem> items = shopManager.getItems(category, page);
-        for (int i = 0; i < Math.min(items.size(), 45); i++) {
-            setItem(i, createShopItem(items.get(i)));
+        // Add custom properties for client rendering
+        JsonArray menuItems = new JsonArray();
+        menuItems.add(createMenuItem("pvp", "PvP Arena", "diamond_sword", 20));
+        menuItems.add(createMenuItem("survival", "Survival", "grass_block", 22));
+        menuItems.add(createMenuItem("lobby", "Lobby", "ender_pearl", 24));
+        windowData.add("menuItems", menuItems);
+    }
+    
+    private JsonObject createMenuItem(String id, String name, String icon, int slot) {
+        JsonObject item = new JsonObject();
+        item.addProperty("id", id);
+        item.addProperty("name", name);
+        item.addProperty("icon", icon);
+        item.addProperty("slot", slot);
+        return item;
+    }
+    
+    @Override
+    public void handleAction(Ref<EntityStore> ref, Store<EntityStore> store, WindowAction action) {
+        if (action instanceof SelectSlotAction select) {
+            switch (select.slot) {
+                case 20 -> joinPvP(ref, store);
+                case 22 -> joinSurvival(ref, store);
+                case 24 -> teleportToLobby(ref, store);
+            }
         }
     }
     
     @Override
-    protected void onAction(Player player, WindowAction action) {
-        if (!(action instanceof ClickSlotAction click)) return;
+    protected boolean onOpen0() { return true; }
+    
+    @Override
+    protected void onClose0() { }
+}
+```
+
+## Material Container Windows
+
+Windows with extra resource materials implement `MaterialContainerWindow`:
+
+```java
+public interface MaterialContainerWindow {
+    @Nonnull MaterialExtraResourcesSection getExtraResourcesSection();
+    void invalidateExtraResources();
+    boolean isValid();
+}
+```
+
+### MaterialExtraResourcesSection
+
+```java
+public class MaterialExtraResourcesSection {
+    private boolean valid;
+    private ItemContainer itemContainer;
+    private ItemQuantity[] extraMaterials;
+    
+    // Methods
+    public void setExtraMaterials(ItemQuantity[] materials);
+    public ExtraResources toPacket();
+    public boolean isValid();
+    public void setValid(boolean valid);
+}
+```
+
+Usage in crafting windows:
+
+```java
+@Override
+public MaterialExtraResourcesSection getExtraResourcesSection() {
+    if (!extraResourcesSection.isValid()) {
+        // Recompute extra materials from bench state
+        CraftingManager.feedExtraResourcesSection(benchState, extraResourcesSection);
+    }
+    return extraResourcesSection;
+}
+
+@Override
+public void invalidateExtraResources() {
+    extraResourcesSection.setValid(false);
+    invalidate();
+}
+```
+
+## Close Event Registration
+
+Register handlers for when a window closes:
+
+```java
+public class MyWindow extends Window {
+    
+    @Override
+    protected boolean onOpen0() {
+        // Register close event handler
+        registerCloseEvent(event -> {
+            // Called when window closes
+            saveData();
+            cleanupResources();
+        });
         
-        int slot = click.getSlot();
+        // With priority
+        registerCloseEvent(EventPriority.FIRST, event -> {
+            // Called first
+        });
         
-        // Navigation
-        if (slot == 45 && page > 0) {
-            page--;
-            setupLayout();
-            sendFullUpdate(player);
-        } else if (slot == 53) {
-            page++;
-            setupLayout();
-            sendFullUpdate(player);
-        } else if (slot == 49) {
-            player.closeWindow();
-        } else if (slot < 45) {
-            // Purchase item
-            handlePurchase(player, slot);
+        return true;
+    }
+}
+```
+
+## Complete Example: Container Block Window
+
+```java
+package com.example.storage;
+
+import com.google.gson.JsonObject;
+import com.hypixel.hytale.component.Ref;
+import com.hypixel.hytale.component.Store;
+import com.hypixel.hytale.protocol.packets.window.WindowAction;
+import com.hypixel.hytale.protocol.packets.window.WindowType;
+import com.hypixel.hytale.protocol.packets.window.SortItemsAction;
+import com.hypixel.hytale.server.core.asset.type.blocktype.config.BlockType;
+import com.hypixel.hytale.server.core.entity.entities.player.windows.BlockWindow;
+import com.hypixel.hytale.server.core.entity.entities.player.windows.ItemContainerWindow;
+import com.hypixel.hytale.server.core.inventory.container.ItemContainer;
+import com.hypixel.hytale.server.core.inventory.container.SimpleItemContainer;
+import com.hypixel.hytale.server.core.inventory.container.SortType;
+import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
+
+public class StorageBlockWindow extends BlockWindow implements ItemContainerWindow {
+    
+    private final SimpleItemContainer itemContainer;
+    private final JsonObject windowData = new JsonObject();
+    
+    public StorageBlockWindow(int x, int y, int z, int rotationIndex, BlockType blockType, int rows) {
+        super(WindowType.Container, x, y, z, rotationIndex, blockType);
+        this.itemContainer = new SimpleItemContainer(rows * 9);
+        
+        // Initialize window data
+        windowData.addProperty("title", "Storage");
+        windowData.addProperty("rows", rows);
+        windowData.addProperty("blockItemId", blockType.getItem().getId());
+    }
+    
+    @Override
+    public JsonObject getData() {
+        return windowData;
+    }
+    
+    @Override
+    public ItemContainer getItemContainer() {
+        return itemContainer;
+    }
+    
+    @Override
+    protected boolean onOpen0() {
+        // Load items from persistent storage
+        loadFromStorage();
+        return true;
+    }
+    
+    @Override
+    protected void onClose0() {
+        // Save items to persistent storage
+        saveToStorage();
+    }
+    
+    @Override
+    public void handleAction(Ref<EntityStore> ref, Store<EntityStore> store, WindowAction action) {
+        if (action instanceof SortItemsAction sort) {
+            SortType serverSortType = SortType.fromPacket(sort.sortType);
+            itemContainer.sort(serverSortType);
+            invalidate();
         }
     }
     
-    private void handlePurchase(Player player, int slot) {
-        ItemStack display = getItem(slot);
-        if (display.isEmpty()) return;
+    private void loadFromStorage() {
+        // Load from block entity or database
+    }
+    
+    private void saveToStorage() {
+        // Save to block entity or database
+    }
+}
+```
+
+### Usage
+
+```java
+@EventHandler
+public void onBlockInteract(BlockInteractEvent event) {
+    Block block = event.getBlock();
+    
+    if (block.getType().getId().equals("my_mod:storage_block")) {
+        StorageBlockWindow window = new StorageBlockWindow(
+            event.getX(), event.getY(), event.getZ(),
+            block.getRotationIndex(),
+            block.getType(),
+            3 // 3 rows
+        );
         
-        ShopItem shopItem = shopManager.getItemBySlot(category, page, slot);
-        if (shopItem == null) return;
+        Player player = event.getPlayer();
+        OpenWindow packet = player.getWindowManager().openWindow(window);
         
-        if (!player.hasEnoughCurrency(shopItem.getPrice())) {
-            player.sendMessage("Not enough currency!");
-            return;
+        if (packet != null) {
+            event.setCancelled(true);
         }
-        
-        player.removeCurrency(shopItem.getPrice());
-        player.getInventory().addItem(shopItem.createItem());
-        player.sendMessage("Purchased " + shopItem.getName() + "!");
     }
 }
 ```
@@ -612,11 +829,17 @@ public class ShopWindow extends Window {
 ### State Management
 
 ```java
-// Always sync state after modifications
-@Override
-protected void onAction(Player player, WindowAction action) {
-    processAction(action);
-    sendFullUpdate(player); // Sync state
+// Always invalidate after modifications
+public void updateValue(String key, Object value) {
+    windowData.addProperty(key, value.toString());
+    invalidate(); // Mark for next update cycle
+}
+
+// For structural changes, use setNeedRebuild
+public void rebuildCategories() {
+    recalculateCategories();
+    setNeedRebuild(); // Client will re-render entire window
+    invalidate();
 }
 ```
 
@@ -624,27 +847,59 @@ protected void onAction(Player player, WindowAction action) {
 
 ```java
 @Override
-protected void onClose(Player player) {
-    // Cancel tasks
-    if (updateTask != null) updateTask.cancel(false);
+protected void onClose0() {
+    // Cancel scheduled tasks
+    if (updateTask != null) {
+        updateTask.cancel(false);
+    }
     
     // Save state
     saveToDatabase();
     
     // Return items to player if needed
-    returnItemsToPlayer(player);
+    returnItemsToPlayer();
+    
+    // Unregister event listeners (if manually registered)
 }
 ```
 
 ### Thread Safety
 
+Window operations should be on the main server thread:
+
 ```java
-// Window operations should be on main thread
-public void updateFromAsync(Player player, Data data) {
+public void updateFromAsync(Data data) {
     server.getScheduler().runTask(() -> {
         applyData(data);
-        sendFullUpdate(player);
+        invalidate();
     });
+}
+```
+
+### Progress Update Throttling
+
+For windows with progress bars (like crafting), throttle updates:
+
+```java
+private static final float MIN_PROGRESS_CHANGE = 0.05f;
+private static final long MIN_UPDATE_INTERVAL_MS = 500L;
+private float lastUpdatePercent;
+private long lastUpdateTimeMs;
+
+private void checkProgressInvalidate(float percent) {
+    if (lastUpdatePercent != percent) {
+        long time = System.currentTimeMillis();
+        if (percent >= 1.0f ||
+            percent < lastUpdatePercent ||
+            percent - lastUpdatePercent > MIN_PROGRESS_CHANGE ||
+            time - lastUpdateTimeMs > MIN_UPDATE_INTERVAL_MS ||
+            lastUpdateTimeMs == 0L) {
+            
+            lastUpdatePercent = percent;
+            lastUpdateTimeMs = time;
+            invalidate();
+        }
+    }
 }
 ```
 
@@ -652,25 +907,34 @@ public void updateFromAsync(Player player, Data data) {
 
 ### Window Not Opening
 
-1. Check player doesn't already have window open
+1. Check `onOpen0()` returns `true`
 2. Verify WindowType is valid
-3. Ensure window size is correct (multiple of 9 for containers)
+3. Check for exceptions in initialization
+4. Ensure WindowManager.openWindow() is called on correct thread
 
 ### Items Not Updating
 
-1. Call `sendFullUpdate()` after modifications
-2. Check slot indices are within bounds
-3. Verify packets are being sent
+1. Call `invalidate()` after modifications
+2. Verify window implements `ItemContainerWindow` correctly
+3. Check `WindowManager.updateWindows()` is being called (usually automatic)
+4. Verify `getItemContainer()` returns the correct container
 
 ### Actions Not Received
 
-1. Ensure action handler is implemented
-2. Check action type casting
-3. Verify window ID matches
+1. Ensure `handleAction()` is implemented
+2. Check action type casting (use `instanceof` pattern matching)
+3. Verify window ID matches in client packets
+
+### Window Closing Unexpectedly
+
+For `BlockWindow` subclasses:
+1. Check player is within `maxDistance` (default 7.0)
+2. Verify block still exists at position
+3. Ensure block type hasn't changed
 
 ## Detailed References
 
 For comprehensive documentation:
 
 - `references/window-types.md` - All window types with configuration options
-- `references/slot-handling.md` - Slot behaviors, item filters, and interactions
+- `references/slot-handling.md` - Item containers, sorting, and inventory handling
