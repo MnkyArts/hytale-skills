@@ -129,7 +129,7 @@ protected void start() {
         initializeWorld(world);
     }
     
-    getLogger().info("Plugin started successfully!");
+    getLogger().atInfo().log("Plugin started successfully!");
 }
 ```
 
@@ -161,7 +161,7 @@ protected void shutdown() {
         databaseConnection.close();
     }
     
-    getLogger().info("Plugin shutdown complete");
+    getLogger().atInfo().log("Plugin shutdown complete");
 }
 ```
 
@@ -340,8 +340,8 @@ private void onOtherPluginSetup(PluginSetupEvent event) {
 ```java
 @Override
 protected void setup() {
-    getLogger().debug("Entering setup phase");
-    getLogger().debug("Registering {} commands", commands.size());
+    getLogger().atFine().log("Entering setup phase");
+    getLogger().atFine().log("Registering %d commands", commands.size());
 }
 ```
 
@@ -364,7 +364,7 @@ private long setupStartTime;
 protected void setup() {
     setupStartTime = System.currentTimeMillis();
     // ... registrations ...
-    getLogger().info("Setup completed in {}ms", 
+    getLogger().atInfo().log("Setup completed in %dms", 
         System.currentTimeMillis() - setupStartTime);
 }
 ```

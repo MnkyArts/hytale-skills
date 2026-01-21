@@ -134,21 +134,21 @@ public class MyPlugin extends JavaPlugin {
     protected void setup() {
         // Called after config load
         // Register: commands, events, components, systems, codecs
-        getLogger().info("MyPlugin setup complete!");
+        getLogger().atInfo().log("MyPlugin setup complete!");
     }
     
     @Override
     protected void start() {
         // Called after all plugins complete setup
         // Safe to interact with other plugins
-        getLogger().info("MyPlugin started!");
+        getLogger().atInfo().log("MyPlugin started!");
     }
     
     @Override
     protected void shutdown() {
         // Called before disable (in reverse load order)
         // Cleanup resources
-        getLogger().info("MyPlugin shutting down!");
+        getLogger().atInfo().log("MyPlugin shutting down!");
     }
 }
 ```
@@ -213,7 +213,7 @@ protected void setup() {
 }
 
 private void onPlayerConnect(PlayerConnectEvent event) {
-    getLogger().info("Player connected: " + event.getPlayer().getName());
+    getLogger().atInfo().log("Player connected: %s", event.getPlayer().getName());
 }
 ```
 
@@ -273,7 +273,7 @@ public class MyPlugin extends JavaPlugin {
     @Override
     protected void setup() {
         MyConfig cfg = config.get();
-        getLogger().info("Config value: " + cfg.someValue());
+        getLogger().atInfo().log("Config value: %s", cfg.someValue());
     }
 }
 
@@ -381,20 +381,30 @@ protected void setup() {
     try {
         getCommandRegistry().registerCommand(new MyCommand());
     } catch (Exception e) {
-        getLogger().error("Failed to register command", e);
+        getLogger().atSevere().withCause(e).log("Failed to register command");
     }
 }
 ```
 
 ### Logging
 
+The Hytale server uses a fluent logging API:
+
 ```java
-// Use the built-in logger
-getLogger().info("Information message");
-getLogger().warn("Warning message");
-getLogger().error("Error message", exception);
-getLogger().debug("Debug message");
+// Use the built-in logger with fluent API
+getLogger().atInfo().log("Information message");
+getLogger().atWarning().log("Warning message");
+getLogger().atSevere().log("Error message");  // or atSevere().withCause(exception).log("Error message")
+getLogger().atFine().log("Debug message");
+
+// With string formatting
+getLogger().atInfo().log("Player %s connected", playerName);
+
+// With exception
+getLogger().atSevere().withCause(exception).log("Failed to process request");
 ```
+
+**Note:** The logger does NOT use `.info()`, `.warn()`, `.error()` methods directly. Always use the fluent pattern: `.atLevel().log("message")`.
 
 ### Resource Cleanup
 

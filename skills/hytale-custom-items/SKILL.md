@@ -585,7 +585,7 @@ private void onItemDrop(DropItemEvent event) {
 
 private void onCraft(CraftRecipeEvent event) {
     CraftingRecipe recipe = event.getRecipe();
-    getLogger().info("Player crafted: " + recipe.getResult().getItem().getId());
+    getLogger().atInfo().log("Player crafted: %s", recipe.getResult().getItem().getId());
 }
 ```
 

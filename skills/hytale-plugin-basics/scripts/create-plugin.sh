@@ -172,7 +172,7 @@ public class $PLUGIN_NAME extends JavaPlugin {
         // Example: getCommandRegistry().registerCommand(new MyCommand());
         // Example: getEventRegistry().registerGlobal(PlayerConnectEvent.class, this::onPlayerConnect);
         
-        getLogger().info("$PLUGIN_NAME setup complete!");
+        getLogger().atInfo().log("$PLUGIN_NAME setup complete!");
     }
     
     @Override
@@ -180,14 +180,14 @@ public class $PLUGIN_NAME extends JavaPlugin {
         // Called after all plugins complete setup
         // Safe to interact with world, players, and other plugins here
         
-        getLogger().info("$PLUGIN_NAME started!");
+        getLogger().atInfo().log("$PLUGIN_NAME started!");
     }
     
     @Override
     protected void shutdown() {
         // Cleanup resources, save data, cancel tasks here
         
-        getLogger().info("$PLUGIN_NAME shutting down!");
+        getLogger().atInfo().log("$PLUGIN_NAME shutting down!");
     }
 }
 EOF

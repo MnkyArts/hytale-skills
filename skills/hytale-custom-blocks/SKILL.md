@@ -575,7 +575,7 @@ private void onBlockTypesLoaded(LoadedAssetsEvent<BlockType> event) {
     // Access loaded block types
     BlockType myBlock = event.getAssetStore().get("MyPlugin:my_custom_block");
     if (myBlock != null) {
-        getLogger().info("Custom block loaded: " + myBlock.getDisplayName());
+        getLogger().atInfo().log("Custom block loaded: %s", myBlock.getDisplayName());
     }
 }
 ```

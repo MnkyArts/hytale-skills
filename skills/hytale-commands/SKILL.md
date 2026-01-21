@@ -157,9 +157,18 @@ public class GiveCommand extends CommandBase {
 
 ### Player-Only Command
 
-Automatically checks that sender is a player:
+Automatically checks that sender is a player. The `execute` method receives 5 parameters:
 
 ```java
+import com.hypixel.hytale.component.Ref;
+import com.hypixel.hytale.component.Store;
+import com.hypixel.hytale.server.core.command.system.CommandContext;
+import com.hypixel.hytale.server.core.command.system.basecommands.AbstractPlayerCommand;
+import com.hypixel.hytale.server.core.universe.PlayerRef;
+import com.hypixel.hytale.server.core.universe.world.World;
+import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
+import javax.annotation.Nonnull;
+
 public class FlyCommand extends AbstractPlayerCommand {
     
     public FlyCommand() {
@@ -167,10 +176,20 @@ public class FlyCommand extends AbstractPlayerCommand {
     }
     
     @Override
-    protected void execute(CommandContext ctx, Player player) {
-        boolean flying = !player.isFlying();
-        player.setFlying(flying);
-        ctx.sendSuccess("Flight " + (flying ? "enabled" : "disabled"));
+    protected void execute(
+        @Nonnull CommandContext context,
+        @Nonnull Store<EntityStore> store,
+        @Nonnull Ref<EntityStore> ref,
+        @Nonnull PlayerRef playerRef,
+        @Nonnull World world
+    ) {
+        // Access player data through PlayerRef
+        String username = playerRef.getUsername();
+        
+        // Execute on world thread for world modifications
+        world.execute(() -> {
+            context.sendSuccess("Flight toggled for " + username);
+        });
     }
 }
 ```
@@ -407,7 +426,7 @@ public class AdminToolsPlugin extends JavaPlugin {
         // Register command collection
         getCommandRegistry().registerCommand(new AdminCommands());
         
-        getLogger().info("AdminTools commands registered!");
+        getLogger().atInfo().log("AdminTools commands registered!");
     }
 }
 ```
@@ -445,7 +464,7 @@ protected void execute(CommandContext ctx) {
         // Execute command
     } catch (Exception e) {
         ctx.sendError("An error occurred: " + e.getMessage());
-        getLogger().error("Command error", e);
+        getLogger().atSevere().withCause(e).log("Command error");
     }
 }
 ```

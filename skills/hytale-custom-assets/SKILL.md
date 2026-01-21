@@ -559,7 +559,7 @@ protected void setup() {
 private void onBlockTypesLoaded(LoadedAssetsEvent<BlockType> event) {
     // Access loaded block types
     for (BlockType block : event.getLoadedAssets()) {
-        getLogger().info("Loaded block: " + block.getId());
+        getLogger().atInfo().log("Loaded block: %s", block.getId());
     }
 }
 ```
@@ -582,7 +582,7 @@ getEventRegistry().register(
 
 private void onAssetReload(AssetStoreMonitorEvent event) {
     if (event.getAssetStore().getAssetClass() == BlockType.class) {
-        getLogger().info("Block types reloaded");
+        getLogger().atInfo().log("Block types reloaded");
         // Re-initialize dependent systems
     }
 }

@@ -160,9 +160,9 @@ public void sendToNearby(Vector3d position, double radius, Packet packet) {
 ```java
 player.getConnection().send(packet).thenAccept(result -> {
     if (result.isSuccess()) {
-        getLogger().info("Packet sent successfully");
+        getLogger().atInfo().log("Packet sent successfully");
     } else {
-        getLogger().warn("Packet failed to send: " + result.getError());
+        getLogger().atWarning().log("Packet failed to send: %s", result.getError());
     }
 });
 ```
@@ -513,7 +513,7 @@ public class RateLimitedHandler implements SubPacketHandler {
         );
         
         if (!limiter.tryAcquire()) {
-            getLogger().warn("Rate limit exceeded for " + player.getName());
+            getLogger().atWarning().log("Rate limit exceeded for %s", player.getName());
             return;
         }
         
@@ -529,7 +529,7 @@ handler.registerHandler(MyPacket.ID, packet -> {
     try {
         processPacket(packet);
     } catch (Exception e) {
-        getLogger().error("Error processing packet", e);
+        getLogger().atSevere().withCause(e).log("Error processing packet");
         
         // Optionally disconnect on critical errors
         if (e instanceof CriticalPacketError) {

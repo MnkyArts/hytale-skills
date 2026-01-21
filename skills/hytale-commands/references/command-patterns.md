@@ -29,9 +29,19 @@ public class PingCommand extends CommandBase {
 
 ### AbstractPlayerCommand
 
-Enforces player-only execution. Provides player instance directly.
+Enforces player-only execution. The execute method receives 5 parameters including Store, Ref, PlayerRef, and World.
 
 ```java
+import com.hypixel.hytale.component.Ref;
+import com.hypixel.hytale.component.Store;
+import com.hypixel.hytale.server.core.command.system.CommandContext;
+import com.hypixel.hytale.server.core.command.system.basecommands.AbstractPlayerCommand;
+import com.hypixel.hytale.server.core.entity.entities.Player;
+import com.hypixel.hytale.server.core.universe.PlayerRef;
+import com.hypixel.hytale.server.core.universe.world.World;
+import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
+import javax.annotation.Nonnull;
+
 public class InventoryCommand extends AbstractPlayerCommand {
     
     public InventoryCommand() {
@@ -39,10 +49,18 @@ public class InventoryCommand extends AbstractPlayerCommand {
     }
     
     @Override
-    protected void execute(CommandContext ctx, Player player) {
-        // player is guaranteed non-null
-        Inventory inv = player.getInventory();
-        ctx.sendMessage("You have " + inv.getItemCount() + " items");
+    protected void execute(
+        @Nonnull CommandContext context,
+        @Nonnull Store<EntityStore> store,
+        @Nonnull Ref<EntityStore> ref,
+        @Nonnull PlayerRef playerRef,
+        @Nonnull World world
+    ) {
+        // Access player data through PlayerRef or get Player component
+        world.execute(() -> {
+            Player player = store.getComponent(ref, Player.getComponentType());
+            context.sendMessage("Username: " + playerRef.getUsername());
+        });
     }
 }
 ```
@@ -185,10 +203,19 @@ public class WarpCommands extends AbstractCommandCollection {
         }
         
         @Override
-        protected void execute(CommandContext ctx, Player player) {
-            String name = ctx.get(NAME);
-            warpManager.setWarp(name, player.getPosition());
-            ctx.sendSuccess("Warp '" + name + "' created!");
+        protected void execute(
+            @Nonnull CommandContext context,
+            @Nonnull Store<EntityStore> store,
+            @Nonnull Ref<EntityStore> ref,
+            @Nonnull PlayerRef playerRef,
+            @Nonnull World world
+        ) {
+            String name = context.get(NAME);
+            world.execute(() -> {
+                Player player = store.getComponent(ref, Player.getComponentType());
+                warpManager.setWarp(name, player.getTransform().getPosition());
+                context.sendSuccess("Warp '" + name + "' created!");
+            });
         }
     }
     
@@ -203,17 +230,26 @@ public class WarpCommands extends AbstractCommandCollection {
         }
         
         @Override
-        protected void execute(CommandContext ctx, Player player) {
-            String name = ctx.get(NAME);
+        protected void execute(
+            @Nonnull CommandContext context,
+            @Nonnull Store<EntityStore> store,
+            @Nonnull Ref<EntityStore> ref,
+            @Nonnull PlayerRef playerRef,
+            @Nonnull World world
+        ) {
+            String name = context.get(NAME);
             Vector3 pos = warpManager.getWarp(name);
             
             if (pos == null) {
-                ctx.sendError("Warp not found: " + name);
+                context.sendError("Warp not found: " + name);
                 return;
             }
             
-            player.teleport(pos);
-            ctx.sendSuccess("Teleported to " + name);
+            world.execute(() -> {
+                Player player = store.getComponent(ref, Player.getComponentType());
+                player.teleport(pos);
+                context.sendSuccess("Teleported to " + name);
+            });
         }
     }
 }
@@ -318,7 +354,7 @@ protected void execute(CommandContext ctx) {
         ctx.sendError("On cooldown. Try again in " + e.getRemainingSeconds() + "s");
     } catch (Exception e) {
         ctx.sendError("An unexpected error occurred");
-        getLogger().error("Command error in " + getName(), e);
+        getLogger().atSevere().withCause(e).log("Command error in %s", getName());
     }
 }
 ```
@@ -542,22 +578,32 @@ public class SetupWizardCommand extends AbstractPlayerCommand {
     }
     
     @Override
-    protected void execute(CommandContext ctx, Player player) {
-        UUID playerId = player.getUniqueId();
+    protected void execute(
+        @Nonnull CommandContext context,
+        @Nonnull Store<EntityStore> store,
+        @Nonnull Ref<EntityStore> ref,
+        @Nonnull PlayerRef playerRef,
+        @Nonnull World world
+    ) {
+        UUID playerId = playerRef.getUuid();
         SetupState state = playerStates.computeIfAbsent(playerId, k -> new SetupState());
-        String input = ctx.get(INPUT);
+        String input = context.get(INPUT);
         
-        switch (state.step()) {
-            case NAME -> handleNameStep(ctx, player, state, input);
-            case LOCATION -> handleLocationStep(ctx, player, state, input);
-            case CONFIRM -> handleConfirmStep(ctx, player, state, input);
-            case DONE -> {
-                playerStates.remove(playerId);
-                ctx.sendMessage("Setup already complete. Starting new setup...");
-                playerStates.put(playerId, new SetupState());
-                promptName(ctx);
+        world.execute(() -> {
+            Player player = store.getComponent(ref, Player.getComponentType());
+            
+            switch (state.step()) {
+                case NAME -> handleNameStep(context, player, state, input);
+                case LOCATION -> handleLocationStep(context, player, state, input);
+                case CONFIRM -> handleConfirmStep(context, player, state, input);
+                case DONE -> {
+                    playerStates.remove(playerId);
+                    context.sendMessage("Setup already complete. Starting new setup...");
+                    playerStates.put(playerId, new SetupState());
+                    promptName(context);
+                }
             }
-        }
+        });
     }
     
     private void handleNameStep(CommandContext ctx, Player player, SetupState state, String input) {

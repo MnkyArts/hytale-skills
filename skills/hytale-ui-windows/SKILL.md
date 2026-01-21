@@ -1,9 +1,9 @@
 ---
 name: hytale-ui-windows
-description: Create custom UI windows, containers, and interactive interfaces for Hytale plugins. Use when asked to "create inventory UI", "make custom window", "add container interface", "build crafting UI", or "custom GUI".
+description: Create custom UI windows, containers, and interactive interfaces for Hytale plugins. Use when asked to "create inventory UI", "make custom window", "add container interface", "build crafting UI", "custom GUI", "create .ui file", or "design UI layout".
 metadata:
   author: hytale-modding
-  version: "1.1.0"
+  version: "1.2.0"
 ---
 
 # Hytale UI Windows
@@ -19,6 +19,99 @@ Use this skill when:
 - Making interactive menus
 - Handling window actions and clicks
 - Syncing window state between server and client
+- Creating .ui layout files for custom pages
+- Designing HUD elements and overlays
+
+## UI System Overview
+
+Hytale's UI system consists of two main approaches:
+
+1. **Window System** (Java) - For inventory containers, crafting benches, and block-tied UIs
+   - Uses `Window` classes with `WindowManager`
+   - Sends JSON data via `getData()`
+   - Handles predefined `WindowAction` types
+   
+2. **Custom UI Pages** (Java) - For dynamic forms, lists, dialogs, and interactive pages
+   - Uses `CustomUIPage` classes with `PageManager`
+   - Loads `.ui` files dynamically via `UICommandBuilder`
+   - Binds events with typed data via `UIEventBuilder`
+
+Both systems use **client-side .ui files** to define visual layout and styling.
+
+### .ui Files
+
+UI files (`.ui`) are client-side layout files that define the visual structure of windows and pages. They use a declarative syntax with:
+
+- **Variables** (`@Name = value;`) - Reusable values and styles
+- **Imports** (`$C = "path/to/file.ui";`) - Reference other UI files
+- **Elements** (`WidgetType { properties }`) - UI widgets with nested children
+- **Templates** (`$C.@TemplateName { overrides }`) - Instantiate reusable components
+
+### IMPORTANT: File Location
+
+**All `.ui` files MUST be placed in `resources/Common/UI/Custom/` in your plugin JAR.**
+
+```
+your-plugin/
+  src/main/resources/
+    manifest.json                    # Must have "IncludesAssetPack": true
+    Common/
+      UI/
+        Custom/
+          MyPage.ui                  # Your custom UI files go here
+          MyHud.ui
+          ListItem.ui
+```
+
+**Requirements:**
+1. Your `manifest.json` MUST contain `"IncludesAssetPack": true`
+2. UI files go in `resources/Common/UI/Custom/` (NOT `assets/Server/Content/UI/Custom/`)
+3. In Java code, reference files by filename only: `commandBuilder.append("MyPage.ui")`
+
+**Common Error:** `Could not find document XXXXX for Custom UI Append command`
+- This means your `.ui` file is not in `Common/UI/Custom/` or the path is wrong
+- Double-check the file location and that `IncludesAssetPack` is set to `true`
+
+### Basic .ui File Structure
+
+```
+$C = "../Common.ui";
+
+$C.@PageOverlay {}                    // Dark background overlay
+
+$C.@Container {
+  Anchor: (Width: 600, Height: 400);
+  
+  #Title {
+    $C.@Title { @Text = %page.title; }
+  }
+  
+  #Content {
+    LayoutMode: Top;
+    
+    Label #ValueLabel { Text: ""; }   // ID for code access
+    
+    $C.@TextButton #ActionBtn {
+      @Text = %page.action;
+    }
+  }
+}
+
+$C.@BackButton {}
+```
+
+### Key Concepts
+
+| Syntax | Purpose | Example |
+|--------|---------|---------|
+| `@Var = value;` | Variable definition | `@FontSize = 16;` |
+| `$Alias = "path";` | Import file | `$C = "../Common.ui";` |
+| `$C.@Template {}` | Use template | `$C.@TextButton {}` |
+| `#ElementId` | Element ID for code | `Label #Title {}` |
+| `%key.path` | Translation key | `Text: %ui.title;` |
+| `...@Style` | Spread/extend | `Style: (...@Base, Bold: true);` |
+
+See `references/ui-file-syntax.md` for complete .ui file documentation.
 
 ## Window Architecture Overview
 
@@ -144,6 +237,18 @@ public class CustomWindow extends Window {
 Windows are opened through the `WindowManager`:
 
 ```java
+import com.hypixel.hytale.component.Ref;
+import com.hypixel.hytale.component.Store;
+import com.hypixel.hytale.server.core.command.system.CommandContext;
+import com.hypixel.hytale.server.core.command.system.basecommands.AbstractPlayerCommand;
+import com.hypixel.hytale.server.core.entity.entities.Player;
+import com.hypixel.hytale.server.core.entity.entities.player.windows.WindowManager;
+import com.hypixel.hytale.server.core.universe.PlayerRef;
+import com.hypixel.hytale.server.core.universe.world.World;
+import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
+import com.hypixel.hytale.protocol.packets.window.OpenWindow;
+import javax.annotation.Nonnull;
+
 public class StorageCommand extends AbstractPlayerCommand {
     
     public StorageCommand() {
@@ -151,20 +256,29 @@ public class StorageCommand extends AbstractPlayerCommand {
     }
     
     @Override
-    protected void execute(CommandContext ctx, Player player) {
-        StorageWindow window = new StorageWindow();
-        
-        // Open via WindowManager
-        WindowManager windowManager = player.getWindowManager();
-        OpenWindow packet = windowManager.openWindow(window);
-        
-        if (packet != null) {
-            // Window opened successfully - packet is sent automatically
-            player.sendMessage("Window opened!");
-        } else {
-            // Opening was cancelled (onOpen0() returned false)
-            player.sendMessage("Failed to open window");
-        }
+    protected void execute(
+        @Nonnull CommandContext context,
+        @Nonnull Store<EntityStore> store,
+        @Nonnull Ref<EntityStore> ref,
+        @Nonnull PlayerRef playerRef,
+        @Nonnull World world
+    ) {
+        world.execute(() -> {
+            Player player = store.getComponent(ref, Player.getComponentType());
+            StorageWindow window = new StorageWindow();
+            
+            // Open via WindowManager
+            WindowManager windowManager = player.getWindowManager();
+            OpenWindow packet = windowManager.openWindow(window);
+            
+            if (packet != null) {
+                // Window opened successfully - packet is sent automatically
+                context.sendSuccess("Window opened!");
+            } else {
+                // Opening was cancelled (onOpen0() returned false)
+                context.sendError("Failed to open window");
+            }
+        });
     }
 }
 ```
@@ -824,6 +938,510 @@ public void onBlockInteract(BlockInteractEvent event) {
 }
 ```
 
+## Creating .ui Files for Windows
+
+### Basic Page Template
+
+Create a new page UI file in `resources/Common/UI/Custom/`:
+
+```
+// MyCustomPage.ui
+$C = "../Common.ui";
+
+$C.@PageOverlay {}
+
+$C.@Container {
+  Anchor: (Width: 500, Height: 400);
+  
+  #Title {
+    $C.@Title {
+      @Text = %server.customUI.myPage.title;
+    }
+  }
+  
+  #Content {
+    LayoutMode: Top;
+    Padding: (Full: 16);
+    
+    // Page content here
+    Label #InfoLabel {
+      Style: $C.@DefaultLabelStyle;
+      Text: "";
+    }
+    
+    Group {
+      Anchor: (Height: 16);  // Spacer
+    }
+    
+    $C.@TextButton #ConfirmButton {
+      @Text = %server.customUI.general.confirm;
+    }
+  }
+}
+
+$C.@BackButton {}
+```
+
+### Container with Header and Scrollable Content
+
+```
+$C = "../Common.ui";
+
+$C.@PageOverlay {}
+
+$C.@Container {
+  Anchor: (Width: 800, Height: 600);
+  
+  #Title {
+    Group {
+      $C.@Title {
+        @Text = %server.customUI.listPage.title;
+      }
+      
+      $C.@HeaderSearch {}  // Search input on right
+    }
+  }
+  
+  #Content {
+    LayoutMode: Left;  // Side-by-side panels
+    
+    // Left panel - list
+    Group #ListView {
+      Anchor: (Width: 250);
+      LayoutMode: TopScrolling;
+      ScrollbarStyle: $C.@DefaultScrollbarStyle;
+    }
+    
+    // Right panel - details
+    Group #DetailView {
+      FlexWeight: 1;
+      LayoutMode: Top;
+      Padding: (Left: 10);
+      
+      Label #ItemName {
+        Style: (FontSize: 20, RenderBold: true);
+        Anchor: (Bottom: 10);
+      }
+      
+      Label #ItemDescription {
+        Style: (FontSize: 14, TextColor: #96a9be, Wrap: true);
+      }
+    }
+  }
+}
+
+$C.@BackButton {}
+```
+
+### Reusable List Item Component
+
+Create in `resources/Common/UI/Custom/MyListItem.ui`:
+
+```
+$C = "../Common.ui";
+$Sounds = "../Sounds.ui";
+
+TextButton {
+  Anchor: (Bottom: 4, Height: 36);
+  Padding: (Horizontal: 12);
+  
+  Style: (
+    Sounds: $Sounds.@ButtonsLight,
+    Default: (
+      LabelStyle: (FontSize: 14, VerticalAlignment: Center),
+      Background: (Color: #00000000)
+    ),
+    Hovered: (
+      LabelStyle: (FontSize: 14, VerticalAlignment: Center),
+      Background: #ffffff(0.1)
+    ),
+    Pressed: (
+      LabelStyle: (FontSize: 14, VerticalAlignment: Center),
+      Background: #ffffff(0.15)
+    )
+  );
+  
+  Text: "";  // Set dynamically
+}
+```
+
+### Grid Layout with Cards
+
+```
+$C = "../Common.ui";
+
+$C.@PageOverlay {}
+
+$C.@DecoratedContainer {
+  Anchor: (Width: 900, Height: 650);
+  
+  #Title {
+    Label {
+      Style: $C.@TitleStyle;
+      Text: %server.customUI.gridPage.title;
+    }
+  }
+  
+  #Content {
+    LayoutMode: Top;
+    
+    // Scrollable grid container
+    Group #GridContainer {
+      FlexWeight: 1;
+      LayoutMode: TopScrolling;
+      ScrollbarStyle: $C.@DefaultScrollbarStyle;
+      Padding: (Full: 8);
+      
+      // Cards wrap automatically
+      Group #CardGrid {
+        LayoutMode: LeftCenterWrap;
+      }
+    }
+    
+    // Footer with actions
+    Group #Footer {
+      Anchor: (Height: 50);
+      LayoutMode: Left;
+      Padding: (Top: 10);
+      
+      Group { FlexWeight: 1; }  // Spacer
+      
+      $C.@SecondaryTextButton #CancelBtn {
+        @Anchor = (Width: 120, Right: 10);
+        @Text = %client.general.button.cancel;
+      }
+      
+      $C.@TextButton #ConfirmBtn {
+        @Anchor = (Width: 120);
+        @Text = %client.general.button.confirm;
+      }
+    }
+  }
+}
+```
+
+### Card Component
+
+```
+$C = "../Common.ui";
+$Sounds = "../Sounds.ui";
+
+Button {
+  Anchor: (Width: 140, Height: 160, Right: 8, Bottom: 8);
+  
+  Style: (
+    Sounds: $Sounds.@ButtonsLight,
+    Default: (Background: (TexturePath: "CardBackground.png", Border: 8)),
+    Hovered: (Background: (TexturePath: "CardBackgroundHovered.png", Border: 8)),
+    Pressed: (Background: (TexturePath: "CardBackgroundPressed.png", Border: 8))
+  );
+  
+  Group {
+    LayoutMode: Top;
+    Anchor: (Full: 8);
+    
+    // Icon
+    Group {
+      LayoutMode: Middle;
+      Anchor: (Height: 80);
+      
+      AssetImage #CardIcon {
+        Anchor: (Width: 64, Height: 64);
+      }
+    }
+    
+    // Title
+    Label #CardTitle {
+      Style: (
+        FontSize: 13,
+        HorizontalAlignment: Center,
+        TextColor: #ffffff,
+        Wrap: true
+      );
+    }
+    
+    // Subtitle
+    Label #CardSubtitle {
+      Style: (
+        FontSize: 11,
+        HorizontalAlignment: Center,
+        TextColor: #7a9cc6
+      );
+    }
+  }
+}
+```
+
+### HUD Element
+
+Create in `resources/Common/UI/Custom/MyHudElement.ui`:
+
+```
+Group {
+  Anchor: (Top: 20, Left: 20, Width: 200, Height: 40);
+  LayoutMode: Left;
+  
+  // Background with transparency
+  Group #Container {
+    Background: #000000(0.4);
+    Padding: (Horizontal: 12, Vertical: 8);
+    LayoutMode: Left;
+    
+    // Icon
+    Group {
+      Background: "StatusIcon.png";
+      Anchor: (Width: 24, Height: 24, Right: 8);
+    }
+    
+    // Value display
+    Label #ValueLabel {
+      Style: (
+        FontSize: 18,
+        VerticalAlignment: Center,
+        TextColor: #ffffff
+      );
+      Text: "0";
+    }
+  }
+}
+```
+
+### Input Form
+
+```
+$C = "../Common.ui";
+
+$C.@PageOverlay {}
+
+$C.@Container {
+  Anchor: (Width: 400, Height: 350);
+  
+  #Title {
+    $C.@Title {
+      @Text = %server.customUI.formPage.title;
+    }
+  }
+  
+  #Content {
+    LayoutMode: Top;
+    Padding: (Full: 16);
+    
+    // Name field
+    Label {
+      Text: %server.customUI.formPage.nameLabel;
+      Style: $C.@DefaultLabelStyle;
+      Anchor: (Bottom: 4);
+    }
+    
+    $C.@TextField #NameInput {
+      PlaceholderText: %server.customUI.formPage.namePlaceholder;
+      Anchor: (Bottom: 12);
+    }
+    
+    // Amount field
+    Label {
+      Text: %server.customUI.formPage.amountLabel;
+      Style: $C.@DefaultLabelStyle;
+      Anchor: (Bottom: 4);
+    }
+    
+    $C.@NumberField #AmountInput {
+      @Anchor = (Width: 100);
+      Value: 1;
+      Format: (MinValue: 1, MaxValue: 64);
+      Anchor: (Bottom: 12);
+    }
+    
+    // Checkbox option
+    $C.@CheckBoxWithLabel #EnableOption {
+      @Text = %server.customUI.formPage.enableOption;
+      @Checked = false;
+      Anchor: (Bottom: 20);
+    }
+    
+    // Submit button
+    $C.@TextButton #SubmitButton {
+      @Text = %server.customUI.general.submit;
+    }
+  }
+}
+
+$C.@BackButton {}
+```
+
+## Custom UI Pages
+
+Custom UI Pages are an alternative to the Window system for displaying server-controlled UI. They provide more flexibility for dynamic content and typed event handling.
+
+### When to Use Custom Pages vs Windows
+
+| Use Custom Pages When | Use Windows When |
+|----------------------|------------------|
+| Dynamic list content | Inventory/item containers |
+| Forms with text inputs | Crafting benches |
+| Search/filter interfaces | Storage containers |
+| Dialog/choice screens | Block-tied interactions |
+| Complex multi-step wizards | Processing/smelting UI |
+
+### Page Class Hierarchy
+
+```
+CustomUIPage (abstract)
+├── BasicCustomUIPage          # Simple static pages
+└── InteractiveCustomUIPage<T> # Typed event handling (most common)
+```
+
+### Quick Start Example
+
+```java
+// 1. Create page class with typed event data
+public class MyPage extends InteractiveCustomUIPage<MyPage.EventData> {
+    
+    public MyPage(PlayerRef playerRef) {
+        super(playerRef, CustomPageLifetime.CanDismiss, EventData.CODEC);
+    }
+    
+    @Override
+    public void build(Ref<EntityStore> ref, UICommandBuilder cmd, UIEventBuilder evt, Store<EntityStore> store) {
+        // Load UI file (from resources/Common/UI/Custom/)
+        cmd.append("MyPage.ui");
+        
+        // Set values
+        cmd.set("#TitleLabel.Text", "Welcome!");
+        
+        // Bind button click
+        evt.addEventBinding(
+            CustomUIEventBindingType.Activating,
+            "#ConfirmButton",
+            EventData.of("Action", "Confirm")
+        );
+    }
+    
+    @Override
+    public void handleDataEvent(Ref<EntityStore> ref, Store<EntityStore> store, EventData data) {
+        if ("Confirm".equals(data.getAction())) {
+            this.close();
+        }
+    }
+    
+    // Event data with codec
+    public static class EventData {
+        public static final BuilderCodec<EventData> CODEC = BuilderCodec.builder(EventData.class, EventData::new)
+            .append(new KeyedCodec<>("Action", Codec.STRING), (e, s) -> e.action = s, e -> e.action)
+            .add()
+            .build();
+        
+        private String action;
+        public String getAction() { return action; }
+    }
+}
+
+// 2. Open from a command (AbstractPlayerCommand has 5 parameters)
+@Override
+protected void execute(
+    @Nonnull CommandContext context,
+    @Nonnull Store<EntityStore> store,
+    @Nonnull Ref<EntityStore> ref,
+    @Nonnull PlayerRef playerRef,
+    @Nonnull World world
+) {
+    world.execute(() -> {
+        Player player = store.getComponent(ref, Player.getComponentType());
+        player.getPageManager().openCustomPage(ref, store, new MyPage(playerRef));
+    });
+}
+```
+
+### Key Components
+
+#### UICommandBuilder
+
+Loads UI files and sets property values. All `.ui` files are in `resources/Common/UI/Custom/`:
+
+```java
+UICommandBuilder cmd = new UICommandBuilder();
+cmd.append("MyPage.ui");                            // Load UI file (just filename)
+cmd.set("#Label.Text", "Hello");                    // Set text
+cmd.set("#Checkbox.Value", true);                   // Set boolean
+cmd.clear("#List");                                 // Clear children
+cmd.append("#List", "ListItem.ui");                 // Add child (just filename)
+```
+
+#### UIEventBuilder
+
+Binds UI events to server callbacks:
+
+```java
+UIEventBuilder evt = new UIEventBuilder();
+
+// Button click with static data
+evt.addEventBinding(
+    CustomUIEventBindingType.Activating,
+    "#Button",
+    EventData.of("Action", "Click")
+);
+
+// Input change capturing value (@ prefix = codec key)
+evt.addEventBinding(
+    CustomUIEventBindingType.ValueChanged,
+    "#SearchInput",
+    EventData.of("@Query", "#SearchInput.Value")
+);
+```
+
+#### CustomPageLifetime
+
+| Value | Description |
+|-------|-------------|
+| `CantClose` | Only server can close |
+| `CanDismiss` | Player can close with ESC |
+| `CanDismissOrCloseThroughInteraction` | ESC or world interaction |
+
+### Dynamic List Pattern
+
+```java
+private void buildList(UICommandBuilder cmd, UIEventBuilder evt) {
+    cmd.clear("#ItemList");
+    
+    for (int i = 0; i < items.size(); i++) {
+        String selector = "#ItemList[" + i + "]";
+        cmd.append("#ItemList", "ListItem.ui");  // Just filename, not path
+        cmd.set(selector + " #Name.Text", items.get(i).getName());
+        evt.addEventBinding(
+            CustomUIEventBindingType.Activating,
+            selector,
+            EventData.of("ItemId", items.get(i).getId()),
+            false  // Don't lock interface
+        );
+    }
+}
+
+// Update list without full rebuild
+public void refreshList() {
+    UICommandBuilder cmd = new UICommandBuilder();
+    UIEventBuilder evt = new UIEventBuilder();
+    buildList(cmd, evt);
+    this.sendUpdate(cmd, evt, false);
+}
+```
+
+### Closing Pages
+
+```java
+// From within page
+this.close();
+
+// From outside
+player.getPageManager().setPage(ref, store, Page.None);
+```
+
+See `references/custom-ui-pages.md` for complete documentation including:
+- Full class reference for CustomUIPage, InteractiveCustomUIPage, BasicCustomUIPage
+- All UICommandBuilder and UIEventBuilder methods
+- CustomUIEventBindingType enum values
+- BuilderCodec pattern for typed event data
+- Complete working examples
+
 ## Best Practices
 
 ### State Management
@@ -936,5 +1554,7 @@ For `BlockWindow` subclasses:
 
 For comprehensive documentation:
 
+- `references/ui-file-syntax.md` - Complete .ui file syntax and widget reference
+- `references/custom-ui-pages.md` - CustomUIPage system, event binding, and typed event handling
 - `references/window-types.md` - All window types with configuration options
 - `references/slot-handling.md` - Item containers, sorting, and inventory handling

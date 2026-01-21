@@ -109,7 +109,7 @@ private void onEvent(SomeEvent event) {
 // Player connecting (before entering world)
 getEventRegistry().registerGlobal(PlayerConnectEvent.class, event -> {
     Player player = event.getPlayer();
-    getLogger().info("Player connecting: " + player.getName());
+    getLogger().atInfo().log("Player connecting: %s", player.getName());
 });
 
 // Player setup connect (cancellable)
@@ -200,7 +200,7 @@ getEventRegistry().register(StartWorldEvent.class, "main", event -> {
 
 // All worlds loaded
 getEventRegistry().registerGlobal(AllWorldsLoadedEvent.class, event -> {
-    getLogger().info("All worlds ready!");
+    getLogger().atInfo().log("All worlds ready!");
 });
 ```
 
@@ -475,12 +475,12 @@ getEventRegistry().register(
 ```java
 getEventRegistry().registerGlobal(AssetPackRegisterEvent.class, event -> {
     AssetPack pack = event.getAssetPack();
-    getLogger().info("Asset pack registered: " + pack.getName());
+    getLogger().atInfo().log("Asset pack registered: %s", pack.getName());
 });
 
 getEventRegistry().registerGlobal(AssetPackUnregisterEvent.class, event -> {
     AssetPack pack = event.getAssetPack();
-    getLogger().info("Asset pack unregistered: " + pack.getName());
+    getLogger().atInfo().log("Asset pack unregistered: %s", pack.getName());
 });
 ```
 
@@ -677,7 +677,7 @@ private void onPlayerConnect(PlayerConnectEvent event) {
     try {
         processPlayer(event.getPlayer());
     } catch (Exception e) {
-        getLogger().error("Error processing player connect", e);
+        getLogger().atSevere().withCause(e).log("Error processing player connect");
         // Don't rethrow - let other handlers run
     }
 }
