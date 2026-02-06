@@ -56,12 +56,29 @@ skills/
 
 ## Usage
 
-These skills are designed to be loaded by AI coding assistants that support the Agent Skills format. It Points your assistant to the relevant `SKILL.md` file when working on that aspect of plugin development.
+These skills are designed to be loaded by AI coding assistants that support the Agent Skills format. Point your assistant to the relevant `SKILL.md` file when working on that aspect of plugin development.
+
+### Skills.sh Compatible
+
+This repository is structured for compatibility with the [skills.sh](https://skills.sh) platform, which enables AI assistants to automatically discover and use these skills. Each skill includes:
+
+- **YAML Front Matter**: Contains metadata (name, description, author, version)
+- **Trigger Phrases**: Description includes quoted phrases that help AI assistants understand when to use the skill
+- **Comprehensive Documentation**: Complete examples, patterns, and references
+- **Reference Files**: Detailed technical documentation in `references/` subdirectories
+
+No additional configuration files are required. AI assistants can consume these skills directly from the repository structure.
 
 ## Contributing
 
 Found an error or want to improve a skill? Contributions are welcome. Keep in mind the experimental nature of this project.
 
+When adding or modifying skills:
+- Ensure each `SKILL.md` has complete YAML front matter
+- Include trigger phrases in the description (quoted phrases like "create a command")
+- Add comprehensive examples and patterns
+- Update this README's skill list if adding new skills
+
 ## License
 
-MIT (obviously)
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.

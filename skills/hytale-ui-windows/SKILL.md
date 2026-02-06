@@ -2,7 +2,7 @@
 name: hytale-ui-windows
 description: Create custom UI windows, containers, and interactive interfaces for Hytale plugins. Use when asked to "create inventory UI", "make custom window", "add container interface", "build crafting UI", "custom GUI", "create .ui file", or "design UI layout".
 metadata:
-  author: hytale-modding
+  author: Liam Robinson (MnkyArts)
   version: "1.2.0"
 ---
 
