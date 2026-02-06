@@ -1,0 +1,46 @@
+# Git files
+.git/
+.gitignore
+.gitattributes
+
+# GitHub files
+.github/
+
+# Documentation that's not part of skills
+LICENSE
+*.md
+!skills/**/SKILL.md
+!skills/**/references/*.md
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Temporary files
+*.tmp
+*.bak
+*.log
+
+# Build artifacts
+dist/
+build/
+*.jar
+*.class
+
+# Node modules (if any)
+node_modules/
+
+# Python cache (if any)
+__pycache__/
+*.pyc
+*.pyo
+
+# Scripts (keep as part of the skill)
+# scripts/ is included as part of hytale-plugin-basics

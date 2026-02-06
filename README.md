@@ -54,9 +54,41 @@ skills/
 └── hytale-crafting-recipes/
 ```
 
+## Installation
+
+### From skills.sh
+
+This repository is published to [skills.sh](https://skills.sh) for easy integration with AI coding assistants:
+
+```bash
+# Install all Hytale skills
+skills install MnkyArts/hytale-skills
+
+# Or install individual skills
+skills install MnkyArts/hytale-skills#hytale-plugin-basics
+skills install MnkyArts/hytale-skills#hytale-custom-blocks
+# ... etc
+```
+
+### Manual Installation
+
+Clone this repository and point your AI coding assistant to the relevant `SKILL.md` file when working on that aspect of plugin development.
+
 ## Usage
 
-These skills are designed to be loaded by AI coding assistants that support the Agent Skills format. It Points your assistant to the relevant `SKILL.md` file when working on that aspect of plugin development.
+These skills are designed to be loaded by AI coding assistants that support the Agent Skills format. Each skill provides comprehensive guidance for a specific domain of Hytale plugin development.
+
+When working on a Hytale plugin, reference the appropriate skill:
+- Creating a new plugin? → `hytale-plugin-basics`
+- Adding custom blocks? → `hytale-custom-blocks`
+- Creating weapons or armor? → `hytale-custom-items`
+- Building custom entities/NPCs? → `hytale-custom-entities`
+- Managing assets? → `hytale-custom-assets`
+- Handling events? → `hytale-events-api`
+- Network communication? → `hytale-networking`
+- Adding commands? → `hytale-commands`
+- Creating UI interfaces? → `hytale-ui-windows`
+- Crafting recipes? → `hytale-crafting-recipes`
 
 ## Contributing
 

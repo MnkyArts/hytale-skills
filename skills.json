@@ -1,0 +1,189 @@
+{
+  "$schema": "https://skills.sh/schema/skills.json",
+  "name": "hytale-skills",
+  "version": "1.0.0",
+  "description": "A collection of Agent Skills for AI-assisted Hytale server plugin development",
+  "author": "Liam Robinson (MnkyArts)",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/MnkyArts/hytale-skills"
+  },
+  "license": "MIT",
+  "tags": [
+    "hytale",
+    "minecraft",
+    "plugin-development",
+    "game-modding",
+    "java",
+    "server-plugins"
+  ],
+  "skills": [
+    {
+      "id": "hytale-plugin-basics",
+      "name": "Hytale Plugin Basics",
+      "description": "Create and structure Hytale server plugins with proper lifecycle, manifest, dependencies, and registries. Use when asked to 'create a Hytale plugin', 'make a Hytale mod', 'start a new Hytale plugin', 'setup plugin structure', or 'write plugin boilerplate'.",
+      "path": "skills/hytale-plugin-basics/SKILL.md",
+      "version": "1.0.0",
+      "author": "Liam Robinson (MnkyArts)",
+      "categories": ["fundamentals", "plugin-development"],
+      "keywords": [
+        "plugin",
+        "manifest",
+        "lifecycle",
+        "registries",
+        "java",
+        "setup"
+      ]
+    },
+    {
+      "id": "hytale-custom-blocks",
+      "name": "Hytale Custom Blocks",
+      "description": "Create custom block types for Hytale with textures, physics, states, farming, and interactions. Use when asked to 'add a custom block', 'create a new block type', 'make blocks farmable', 'add block interactions', or 'configure block physics'.",
+      "path": "skills/hytale-custom-blocks/SKILL.md",
+      "version": "1.0.0",
+      "author": "Liam Robinson (MnkyArts)",
+      "categories": ["content-creation", "blocks"],
+      "keywords": [
+        "blocks",
+        "custom-blocks",
+        "block-states",
+        "materials",
+        "physics"
+      ]
+    },
+    {
+      "id": "hytale-custom-items",
+      "name": "Hytale Custom Items",
+      "description": "Create custom items for Hytale including tools, weapons, armor, consumables, and special items. Use when asked to 'add a custom item', 'create a weapon', 'make armor', 'add a tool', or 'create consumable items'.",
+      "path": "skills/hytale-custom-items/SKILL.md",
+      "version": "1.0.0",
+      "author": "Liam Robinson (MnkyArts)",
+      "categories": ["content-creation", "items"],
+      "keywords": [
+        "items",
+        "weapons",
+        "armor",
+        "tools",
+        "consumables",
+        "stats"
+      ]
+    },
+    {
+      "id": "hytale-custom-entities",
+      "name": "Hytale Custom Entities",
+      "description": "Create custom entities and NPCs for Hytale with AI behaviors, components, spawning, and animations. Use when asked to 'create a custom entity', 'add an NPC', 'make a mob', 'design AI behavior', or 'configure entity spawning'.",
+      "path": "skills/hytale-custom-entities/SKILL.md",
+      "version": "1.0.0",
+      "author": "Liam Robinson (MnkyArts)",
+      "categories": ["content-creation", "entities"],
+      "keywords": [
+        "entities",
+        "npcs",
+        "mobs",
+        "ai",
+        "ecs",
+        "components",
+        "spawning"
+      ]
+    },
+    {
+      "id": "hytale-custom-assets",
+      "name": "Hytale Custom Assets",
+      "description": "Create and manage custom assets for Hytale including models, textures, sounds, particles, and asset packs. Use when asked to 'add custom assets', 'create textures', 'make models', 'add sounds', 'configure particles', or 'build an asset pack'.",
+      "path": "skills/hytale-custom-assets/SKILL.md",
+      "version": "1.0.0",
+      "author": "Liam Robinson (MnkyArts)",
+      "categories": ["content-creation", "assets"],
+      "keywords": [
+        "assets",
+        "models",
+        "textures",
+        "sounds",
+        "particles",
+        "animations"
+      ]
+    },
+    {
+      "id": "hytale-events-api",
+      "name": "Hytale Events API",
+      "description": "Handle Hytale server events including player actions, world changes, entity interactions, and custom events. Use when asked to 'listen for events', 'handle player actions', 'react to block changes', 'create event handlers', or 'implement event listeners'.",
+      "path": "skills/hytale-events-api/SKILL.md",
+      "version": "1.0.0",
+      "author": "Liam Robinson (MnkyArts)",
+      "categories": ["api", "events"],
+      "keywords": [
+        "events",
+        "listeners",
+        "event-handlers",
+        "custom-events",
+        "event-bus"
+      ]
+    },
+    {
+      "id": "hytale-networking",
+      "name": "Hytale Networking",
+      "description": "Handle Hytale network packets, create custom packets, and implement client-server communication. Use when asked to 'create custom packets', 'handle network messages', 'send data to client', 'receive client data', or 'implement networking'.",
+      "path": "skills/hytale-networking/SKILL.md",
+      "version": "1.0.0",
+      "author": "Liam Robinson (MnkyArts)",
+      "categories": ["api", "networking"],
+      "keywords": [
+        "networking",
+        "packets",
+        "serialization",
+        "client-server",
+        "communication"
+      ]
+    },
+    {
+      "id": "hytale-commands",
+      "name": "Hytale Commands",
+      "description": "Create custom commands for Hytale server plugins with arguments, permissions, and execution handling. Use when asked to 'create a command', 'add slash command', 'make admin command', 'register commands', or 'command with arguments'.",
+      "path": "skills/hytale-commands/SKILL.md",
+      "version": "1.0.0",
+      "author": "Liam Robinson (MnkyArts)",
+      "categories": ["api", "commands"],
+      "keywords": [
+        "commands",
+        "slash-commands",
+        "arguments",
+        "permissions",
+        "command-handlers"
+      ]
+    },
+    {
+      "id": "hytale-ui-windows",
+      "name": "Hytale UI Windows",
+      "description": "Create custom UI windows, containers, and interactive interfaces for Hytale plugins. Use when asked to 'create inventory UI', 'make custom window', 'add container interface', 'build crafting UI', 'custom GUI', 'create .ui file', or 'design UI layout'.",
+      "path": "skills/hytale-ui-windows/SKILL.md",
+      "version": "1.2.0",
+      "author": "hytale-modding",
+      "categories": ["ui", "interfaces"],
+      "keywords": [
+        "ui",
+        "windows",
+        "containers",
+        "interfaces",
+        "inventory",
+        "crafting"
+      ]
+    },
+    {
+      "id": "hytale-crafting-recipes",
+      "name": "Hytale Crafting Recipes",
+      "description": "Create custom crafting recipes for Hytale plugins including shaped, shapeless, processing, and blueprint recipes. Use when asked to 'add crafting recipe', 'create recipe', 'make craftable item', 'add smelting recipe', or 'custom crafting'.",
+      "path": "skills/hytale-crafting-recipes/SKILL.md",
+      "version": "1.0.0",
+      "author": "hytale-modding",
+      "categories": ["game-mechanics", "crafting"],
+      "keywords": [
+        "crafting",
+        "recipes",
+        "shaped",
+        "shapeless",
+        "processing",
+        "blueprints"
+      ]
+    }
+  ]
+}
