@@ -2,7 +2,7 @@
 name: hytale-crafting-recipes
 description: Create custom crafting recipes for Hytale plugins including shaped, shapeless, processing, and blueprint recipes. Use when asked to "add crafting recipe", "create recipe", "make craftable item", "add smelting recipe", or "custom crafting".
 metadata:
-  author: hytale-modding
+  author: Liam Robinson (MnkyArts)
   version: "1.0.0"
 ---
 
